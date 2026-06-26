@@ -9,18 +9,8 @@ class ProduceCreate(BaseModel):
     harvest_date: date
     location: str
     image_url: Optional[str] = None
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "produce_name": "Tomato",
-                "quantity": 150.0,
-                "harvest_date": "2024-06-20",
-                "location": "Nashik, Maharashtra",
-                "image_url": None
-            }
-        }
-    }
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class ProduceUpdate(BaseModel):
@@ -29,6 +19,8 @@ class ProduceUpdate(BaseModel):
     harvest_date: Optional[date] = None
     location: Optional[str] = None
     image_url: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class ProduceOut(BaseModel):
@@ -42,6 +34,8 @@ class ProduceOut(BaseModel):
     image_url: Optional[str]
     status: str
     created_at: datetime
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class PickupRequestOut(BaseModel):

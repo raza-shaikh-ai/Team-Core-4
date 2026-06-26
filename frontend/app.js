@@ -42,18 +42,39 @@ const otpBackLink = document.getElementById('otp-back-link');
 const tabFarmerListings = document.getElementById('tab-farmer-listings');
 const tabFarmerRequests = document.getElementById('tab-farmer-requests');
 const tabFarmerHistory = document.getElementById('tab-farmer-history');
+const tabFarmerMap = document.getElementById('tab-farmer-map');
+const tabFarmerStats = document.getElementById('tab-farmer-stats');
 const farmerListingsTabContent = document.getElementById('farmer-listings-tab-content');
 const farmerRequestsTabContent = document.getElementById('farmer-requests-tab-content');
 const farmerHistoryTabContent = document.getElementById('farmer-history-tab-content');
+const farmerMapTabContent = document.getElementById('farmer-map-tab-content');
+const farmerStatsTabContent = document.getElementById('farmer-stats-tab-content');
 
 const tabNgoBrowse = document.getElementById('tab-ngo-browse');
 const tabNgoRequests = document.getElementById('tab-ngo-requests');
 const tabNgoHistory = document.getElementById('tab-ngo-history');
+const tabNgoMap = document.getElementById('tab-ngo-map');
+const tabNgoStats = document.getElementById('tab-ngo-stats');
 const ngoBrowseTabContent = document.getElementById('ngo-browse-tab-content');
 const ngoRequestsTabContent = document.getElementById('ngo-requests-tab-content');
 const ngoHistoryTabContent = document.getElementById('ngo-history-tab-content');
+const ngoMapTabContent = document.getElementById('ngo-map-tab-content');
+const ngoStatsTabContent = document.getElementById('ngo-stats-tab-content');
 
 const applyFiltersBtn = document.getElementById('apply-filters-btn');
+
+// Geolocation refs
+const regDetectBtn = document.getElementById('reg-detect-btn');
+const regLocationDisplay = document.getElementById('reg-location-display');
+const regLat = document.getElementById('reg-lat');
+const regLng = document.getElementById('reg-lng');
+const regLocStatus = document.getElementById('reg-loc-status');
+
+const produceDetectBtn = document.getElementById('produce-detect-btn');
+const produceLocation = document.getElementById('produce-location');
+const produceLat = document.getElementById('produce-lat');
+const produceLng = document.getElementById('produce-lng');
+const produceLocStatus = document.getElementById('produce-loc-status');
 
 let isRegisterMode = false;
 
@@ -129,6 +150,7 @@ authToggleLink.addEventListener('click', (e) => {
         authSubtitle.textContent = 'Register to join the surplus distribution network';
         nameGroup.style.display = 'block';
         roleGroup.style.display = 'block';
+        document.getElementById('reg-location-group').style.display = 'block';
         authSubmitBtn.textContent = 'Register';
         authToggleText.textContent = 'Already have an account?';
         authToggleLink.textContent = 'Login here';
@@ -138,6 +160,7 @@ authToggleLink.addEventListener('click', (e) => {
         authSubtitle.textContent = 'Login to connect surplus produce with those in need';
         nameGroup.style.display = 'none';
         roleGroup.style.display = 'none';
+        document.getElementById('reg-location-group').style.display = 'none';
         authSubmitBtn.textContent = 'Login';
         authToggleText.textContent = "Don't have an account?";
         authToggleLink.textContent = 'Register here';
@@ -155,11 +178,15 @@ authForm.addEventListener('submit', async (e) => {
         if (isRegisterMode) {
             const name = regNameInput.value;
             const role = document.querySelector('input[name="user-role"]:checked').value;
+            const latVal = regLat.value;
+            const lngVal = regLng.value;
+            const latitude = latVal ? parseFloat(latVal) : null;
+            const longitude = lngVal ? parseFloat(lngVal) : null;
             
             const response = await fetch(`${API_BASE}/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, password, role })
+                body: JSON.stringify({ name, email, password, role, latitude, longitude })
             });
 
             if (!response.ok) {
@@ -247,6 +274,17 @@ produceImageFile.addEventListener('change', async () => {
     const formData = new FormData();
     formData.append('file', file);
 
+    const submitBtn = document.getElementById('submit-produce-btn');
+    const uploadLabel = document.querySelector('.file-upload-wrapper span');
+    
+    // Disable submit and show uploading state
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Uploading image...';
+    submitBtn.style.opacity = '0.6';
+    submitBtn.style.cursor = 'not-allowed';
+    
+    uploadLabel.textContent = 'Uploading to cloud... ⏳';
+
     try {
         const response = await fetch(`${API_BASE}/upload/image`, {
             method: 'POST',
@@ -266,20 +304,34 @@ produceImageFile.addEventListener('change', async () => {
         imageUploadPreview.src = data.url;
         imageUploadPreview.style.display = 'block';
         showToast('Image uploaded successfully');
+        uploadLabel.textContent = 'Change selected image';
     } catch (err) {
         showToast(err.message, 'error');
+        uploadLabel.textContent = 'Upload failed. Click to try again.';
+        produceImageUrl.value = '';
+        imageUploadPreview.style.display = 'none';
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Listing';
+        submitBtn.style.opacity = '1';
+        submitBtn.style.cursor = 'pointer';
     }
 });
 
 uploadProduceForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    const latVal = produceLat.value;
+    const lngVal = produceLng.value;
+
     const payload = {
         produce_name: document.getElementById('produce-name').value,
         quantity: parseFloat(document.getElementById('produce-quantity').value),
         harvest_date: document.getElementById('produce-date').value,
         location: document.getElementById('produce-location').value,
-        image_url: produceImageUrl.value || null
+        image_url: produceImageUrl.value || null,
+        latitude: latVal ? parseFloat(latVal) : null,
+        longitude: lngVal ? parseFloat(lngVal) : null
     };
 
     try {
@@ -300,70 +352,112 @@ uploadProduceForm.addEventListener('submit', async (e) => {
         showToast('Produce listing shared successfully');
         uploadProduceForm.reset();
         imageUploadPreview.style.display = 'none';
+        produceLat.value = '';
+        produceLng.value = '';
+        produceLocStatus.textContent = '';
+        document.querySelector('.file-upload-wrapper span').textContent = 'Click to upload image';
         loadFarmerListings();
     } catch (err) {
         showToast(err.message, 'error');
     }
 });
 
-tabFarmerListings.addEventListener('click', () => {
-    tabFarmerListings.classList.add('active');
+function deactivateAllFarmerTabs() {
+    tabFarmerListings.classList.remove('active');
     tabFarmerRequests.classList.remove('active');
     tabFarmerHistory.classList.remove('active');
-    farmerListingsTabContent.style.display = 'block';
+    tabFarmerMap.classList.remove('active');
+    tabFarmerStats.classList.remove('active');
+    
+    farmerListingsTabContent.style.display = 'none';
     farmerRequestsTabContent.style.display = 'none';
     farmerHistoryTabContent.style.display = 'none';
+    farmerMapTabContent.style.display = 'none';
+    farmerStatsTabContent.style.display = 'none';
+}
+
+tabFarmerListings.addEventListener('click', () => {
+    deactivateAllFarmerTabs();
+    tabFarmerListings.classList.add('active');
+    farmerListingsTabContent.style.display = 'block';
     loadFarmerListings();
 });
 
 tabFarmerRequests.addEventListener('click', () => {
-    tabFarmerListings.classList.remove('active');
+    deactivateAllFarmerTabs();
     tabFarmerRequests.classList.add('active');
-    tabFarmerHistory.classList.remove('active');
-    farmerListingsTabContent.style.display = 'none';
     farmerRequestsTabContent.style.display = 'block';
-    farmerHistoryTabContent.style.display = 'none';
     loadFarmerRequests();
 });
 
 tabFarmerHistory.addEventListener('click', () => {
-    tabFarmerListings.classList.remove('active');
-    tabFarmerRequests.classList.remove('active');
+    deactivateAllFarmerTabs();
     tabFarmerHistory.classList.add('active');
-    farmerListingsTabContent.style.display = 'none';
-    farmerRequestsTabContent.style.display = 'none';
     farmerHistoryTabContent.style.display = 'block';
     loadFarmerHistory();
 });
 
-tabNgoBrowse.addEventListener('click', () => {
-    tabNgoBrowse.classList.add('active');
+tabFarmerMap.addEventListener('click', () => {
+    deactivateAllFarmerTabs();
+    tabFarmerMap.classList.add('active');
+    farmerMapTabContent.style.display = 'block';
+    loadMap('Farmer');
+});
+
+tabFarmerStats.addEventListener('click', () => {
+    deactivateAllFarmerTabs();
+    tabFarmerStats.classList.add('active');
+    farmerStatsTabContent.style.display = 'block';
+    loadFarmerStats();
+});
+
+function deactivateAllNgoTabs() {
+    tabNgoBrowse.classList.remove('active');
     tabNgoRequests.classList.remove('active');
     tabNgoHistory.classList.remove('active');
-    ngoBrowseTabContent.style.display = 'block';
+    tabNgoMap.classList.remove('active');
+    tabNgoStats.classList.remove('active');
+    
+    ngoBrowseTabContent.style.display = 'none';
     ngoRequestsTabContent.style.display = 'none';
     ngoHistoryTabContent.style.display = 'none';
+    ngoMapTabContent.style.display = 'none';
+    ngoStatsTabContent.style.display = 'none';
+}
+
+tabNgoBrowse.addEventListener('click', () => {
+    deactivateAllNgoTabs();
+    tabNgoBrowse.classList.add('active');
+    ngoBrowseTabContent.style.display = 'block';
     loadNgoBrowse();
 });
 
 tabNgoRequests.addEventListener('click', () => {
-    tabNgoBrowse.classList.remove('active');
+    deactivateAllNgoTabs();
     tabNgoRequests.classList.add('active');
-    tabNgoHistory.classList.remove('active');
-    ngoBrowseTabContent.style.display = 'none';
     ngoRequestsTabContent.style.display = 'block';
-    ngoHistoryTabContent.style.display = 'none';
     loadNgoRequests();
 });
 
 tabNgoHistory.addEventListener('click', () => {
-    tabNgoBrowse.classList.remove('active');
-    tabNgoRequests.classList.remove('active');
+    deactivateAllNgoTabs();
     tabNgoHistory.classList.add('active');
-    ngoBrowseTabContent.style.display = 'none';
-    ngoRequestsTabContent.style.display = 'none';
     ngoHistoryTabContent.style.display = 'block';
     loadNgoHistory();
+});
+
+tabNgoMap.addEventListener('click', () => {
+    deactivateAllNgoTabs();
+    tabNgoMap.classList.add('active');
+    ngoMapTabContent.style.display = 'block';
+    loadMap('NGO');
+});
+
+tabNgoStats.addEventListener('click', () => {
+    deactivateAllNgoTabs();
+    tabNgoStats.classList.add('active');
+    ngoStatsTabContent.style.display = 'block';
+    loadNgoStats();
 });
 
 applyFiltersBtn.addEventListener('click', () => {
@@ -375,9 +469,71 @@ async function loadFarmerDashboard() {
     loadFarmerRequests();
 }
 
+// NGO Geolocation state & distance calculators
+let ngoCurrentCoords = null;
+
+async function fetchOSRMDistance(lat1, lon1, lat2, lon2) {
+    const url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=false`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("OSRM routing failed");
+    const data = await response.json();
+    if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+        return data.routes[0].distance / 1000; // convert meters to km
+    }
+    throw new Error("No route found in OSRM response");
+}
+
+function getHaversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+}
+
 async function loadNgoDashboard() {
-    loadNgoBrowse();
-    loadNgoRequests();
+    // Attempt to get live geolocation first
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                ngoCurrentCoords = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                loadNgoBrowse();
+                loadNgoRequests();
+            },
+            (error) => {
+                console.warn("Live location failed or denied. Falling back to profile location.", error);
+                if (currentUser && currentUser.latitude && currentUser.longitude) {
+                    ngoCurrentCoords = {
+                        lat: currentUser.latitude,
+                        lng: currentUser.longitude
+                    };
+                } else {
+                    ngoCurrentCoords = null;
+                }
+                loadNgoBrowse();
+                loadNgoRequests();
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+    } else {
+        if (currentUser && currentUser.latitude && currentUser.longitude) {
+            ngoCurrentCoords = {
+                lat: currentUser.latitude,
+                lng: currentUser.longitude
+            };
+        } else {
+            ngoCurrentCoords = null;
+        }
+        loadNgoBrowse();
+        loadNgoRequests();
+    }
 }
 
 async function loadFarmerListings() {
@@ -528,10 +684,48 @@ async function loadNgoBrowse() {
         if (!response.ok) throw new Error('Failed to search produce');
 
         const all = await response.json();
-        const items = all.filter(i => i.status !== 'delivered');
+        let items = all.filter(i => i.status !== 'delivered');
         if (items.length === 0) {
             listEl.innerHTML = '<div class="no-data" style="grid-column: 1/-1;">No produce matches your criteria.</div>';
             return;
+        }
+
+        // Calculate distance from NGO location to each produce item if coords available
+        if (ngoCurrentCoords) {
+            const distancePromises = items.map(async (item) => {
+                if (item.latitude && item.longitude) {
+                    try {
+                        item.distance = await fetchOSRMDistance(
+                            ngoCurrentCoords.lat,
+                            ngoCurrentCoords.lng,
+                            item.latitude,
+                            item.longitude
+                        );
+                        item.distanceMethod = "road";
+                    } catch (err) {
+                        console.warn("OSRM routing failed, falling back to Haversine direct distance:", err);
+                        item.distance = getHaversineDistance(
+                            ngoCurrentCoords.lat,
+                            ngoCurrentCoords.lng,
+                            item.latitude,
+                            item.longitude
+                        );
+                        item.distanceMethod = "direct";
+                    }
+                } else {
+                    item.distance = null;
+                    item.distanceMethod = null;
+                }
+            });
+
+            await Promise.all(distancePromises);
+
+            // Sort closest first, items with null distance placed at the end
+            items.sort((a, b) => {
+                if (a.distance === null) return 1;
+                if (b.distance === null) return -1;
+                return a.distance - b.distance;
+            });
         }
 
         listEl.innerHTML = items.map(item => `
@@ -558,6 +752,12 @@ async function loadNgoBrowse() {
                         <span class="produce-meta-label">Location:</span>
                         <span>${item.location}</span>
                     </div>
+                    ${item.distance !== undefined && item.distance !== null ? `
+                    <div class="produce-meta" style="color: #10b981; font-weight: 600; margin-top: 0.25rem;">
+                        <span class="produce-meta-label">📍 Distance:</span>
+                        <span>${item.distance.toFixed(1)} km away (${item.distanceMethod})</span>
+                    </div>
+                    ` : ''}
                 </div>
                 <div class="produce-footer">
                     ${item.status === 'available' ? `
@@ -733,6 +933,271 @@ async function loadNgoHistory() {
         `).join('');
     } catch (err) {
         listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1; color: var(--danger);">${err.message}</div>`;
+    }
+}
+
+// Geolocation logic
+async function detectLocation(latInputId, lngInputId, displayInputId, statusId) {
+    const latInput = document.getElementById(latInputId);
+    const lngInput = document.getElementById(lngInputId);
+    const displayInput = document.getElementById(displayInputId);
+    const statusEl = document.getElementById(statusId);
+
+    if (!navigator.geolocation) {
+        statusEl.textContent = "Geolocation is not supported by your browser.";
+        statusEl.style.color = "var(--danger)";
+        return;
+    }
+
+    statusEl.textContent = "Locating...";
+    statusEl.style.color = "#16a34a";
+
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            latInput.value = lat;
+            lngInput.value = lng;
+
+            statusEl.textContent = "Fetching address...";
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+                if (!response.ok) throw new Error("Failed reverse geocoding");
+                const data = await response.json();
+                const address = data.display_name || `${lat}, ${lng}`;
+                displayInput.value = address;
+                statusEl.textContent = "Location detected successfully.";
+                statusEl.style.color = "#16a34a";
+            } catch (err) {
+                console.error(err);
+                displayInput.value = `${lat}, ${lng}`;
+                statusEl.textContent = "Location detected (could not fetch address).";
+                statusEl.style.color = "#d97706";
+            }
+        },
+        (error) => {
+            console.error(error);
+            let msg = "Unable to retrieve your location.";
+            if (error.code === error.PERMISSION_DENIED) {
+                msg = "Location permission denied. Please enter address manually.";
+            }
+            statusEl.textContent = msg;
+            statusEl.style.color = "var(--danger)";
+            displayInput.readOnly = false;
+            displayInput.placeholder = "Enter address manually...";
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+}
+
+regDetectBtn.addEventListener('click', () => {
+    detectLocation('reg-lat', 'reg-lng', 'reg-location-display', 'reg-loc-status');
+});
+
+produceDetectBtn.addEventListener('click', () => {
+    detectLocation('produce-lat', 'produce-lng', 'produce-location', 'produce-loc-status');
+});
+
+// Leaflet Map Logic
+let farmerMapInstance = null;
+let ngoMapInstance = null;
+
+async function loadMap(role) {
+    const mapId = role === 'Farmer' ? 'farmer-map' : 'ngo-map';
+    
+    try {
+        const response = await fetch(`${API_BASE}/map/data`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to load map data');
+        const data = await response.json();
+
+        // Clear existing map instance to re-initialize safely
+        if (role === 'Farmer' && farmerMapInstance) {
+            farmerMapInstance.remove();
+            farmerMapInstance = null;
+        } else if (role === 'NGO' && ngoMapInstance) {
+            ngoMapInstance.remove();
+            ngoMapInstance = null;
+        }
+
+        const map = L.map(mapId).setView([20.5937, 78.9629], 5);
+        if (role === 'Farmer') {
+            farmerMapInstance = map;
+        } else {
+            ngoMapInstance = map;
+        }
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        const markers = [];
+
+        const greenIcon = new L.Icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+
+        const blueIcon = new L.Icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+
+        data.farmers.forEach(farmer => {
+            if (farmer.lat && farmer.lng) {
+                const marker = L.marker([farmer.lat, farmer.lng], { icon: greenIcon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <div style="font-family: sans-serif; line-height: 1.4;">
+                            <h4 style="margin: 0 0 4px 0; color: #16a34a; font-weight: bold;">🌾 ${farmer.name}</h4>
+                            <p style="margin: 0 0 2px 0;"><strong>Produce:</strong> ${farmer.produce_name}</p>
+                            <p style="margin: 0 0 2px 0;"><strong>Quantity:</strong> ${farmer.quantity} kg</p>
+                            <p style="margin: 0 0 2px 0;"><strong>Status:</strong> <span class="badge-${farmer.status}" style="font-size: 11px; padding: 2px 6px; border-radius: 4px;">${farmer.status.replace('_', ' ')}</span></p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;">📍 ${farmer.location}</p>
+                        </div>
+                    `);
+                markers.push(marker);
+            }
+        });
+
+        data.ngos.forEach(ngo => {
+            if (ngo.lat && ngo.lng) {
+                const marker = L.marker([ngo.lat, ngo.lng], { icon: blueIcon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <div style="font-family: sans-serif; line-height: 1.4;">
+                            <h4 style="margin: 0 0 4px 0; color: #2563eb; font-weight: bold;">🏢 ${ngo.name}</h4>
+                            <p style="margin: 0 0 2px 0;"><strong>Type:</strong> NGO / Food Bank</p>
+                            <p style="margin: 0 0 2px 0;"><strong>Status:</strong> Active</p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;">📍 Registered Partner</p>
+                        </div>
+                    `);
+                markers.push(marker);
+            }
+        });
+
+        if (markers.length > 0) {
+            const group = new L.featureGroup(markers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 100);
+
+    } catch (err) {
+        console.error(err);
+        showToast(err.message, 'error');
+    }
+}
+
+// Analytics Logic
+async function loadFarmerStats() {
+    const container = document.getElementById('farmer-stats-container');
+    container.innerHTML = `<div class="stat-skeleton h-48 w-full rounded-2xl"></div>`;
+    try {
+        const response = await fetch(`${API_BASE}/stats/farmer`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to load stats');
+        const data = await response.json();
+        container.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl text-2xl">🌾</div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Uploaded</p>
+                        <h3 class="text-2xl font-bold text-slate-800">${data.total_uploaded}</h3>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="p-3 bg-blue-50 text-blue-600 rounded-xl text-2xl">📋</div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Active Listings</p>
+                        <h3 class="text-2xl font-bold text-slate-800">${data.active_listings}</h3>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="p-3 bg-amber-50 text-amber-600 rounded-xl text-2xl">⏳</div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Pending Requests</p>
+                        <h3 class="text-2xl font-bold text-slate-800">${data.pending_requests}</h3>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="p-3 bg-purple-50 text-purple-600 rounded-xl text-2xl">📦</div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Completed Donations</p>
+                        <h3 class="text-2xl font-bold text-slate-800">${data.completed_donations}</h3>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 md:col-span-2">
+                    <div class="p-3 bg-teal-50 text-teal-600 rounded-xl text-2xl">⚖️</div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Produce Donated</p>
+                        <h3 class="text-2xl font-bold text-slate-800">${data.total_kg_donated} kg</h3>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        container.innerHTML = `<div class="text-red-500 font-medium">${err.message}</div>`;
+    }
+}
+
+async function loadNgoStats() {
+    const container = document.getElementById('ngo-stats-container');
+    container.innerHTML = `<div class="stat-skeleton h-48 w-full rounded-2xl"></div>`;
+    try {
+        const response = await fetch(`${API_BASE}/stats/ngo`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to load stats');
+        const data = await response.json();
+        container.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="p-3 bg-blue-50 text-blue-600 rounded-xl text-2xl">📤</div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Requests Sent</p>
+                        <h3 class="text-2xl font-bold text-slate-800">${data.total_requests}</h3>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="p-3 bg-amber-50 text-amber-600 rounded-xl text-2xl">🤝</div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Accepted (Scheduled)</p>
+                        <h3 class="text-2xl font-bold text-slate-800">${data.accepted_requests}</h3>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl text-2xl">✓</div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Completed Deliveries</p>
+                        <h3 class="text-2xl font-bold text-slate-800">${data.completed_deliveries}</h3>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="p-3 bg-teal-50 text-teal-600 rounded-xl text-2xl">⚖️</div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Quantity Received</p>
+                        <h3 class="text-2xl font-bold text-slate-800">${data.total_kg_received} kg</h3>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        container.innerHTML = `<div class="text-red-500 font-medium">${err.message}</div>`;
     }
 }
 

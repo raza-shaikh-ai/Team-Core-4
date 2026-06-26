@@ -25,8 +25,8 @@ def create_produce(
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
-                INSERT INTO produce (farmer_id, produce_name, quantity, harvest_date, location, image_url)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO produce (farmer_id, produce_name, quantity, harvest_date, location, image_url, latitude, longitude)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING *
                 """,
                 (
@@ -36,6 +36,8 @@ def create_produce(
                     payload.harvest_date,
                     payload.location,
                     payload.image_url,
+                    payload.latitude,
+                    payload.longitude,
                 ),
             )
             row = dict(cur.fetchone())

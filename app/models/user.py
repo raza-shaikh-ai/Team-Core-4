@@ -8,31 +8,13 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str
     role: Literal["Farmer", "NGO"]
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "name": "Raju Farmer",
-                "email": "raju@farm.com",
-                "password": "secret123",
-                "role": "Farmer"
-            }
-        }
-    }
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "email": "raju@farm.com",
-                "password": "secret123"
-            }
-        }
-    }
 
 
 class UserOut(BaseModel):
@@ -41,6 +23,8 @@ class UserOut(BaseModel):
     email: str
     role: str
     created_at: datetime
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class TokenResponse(BaseModel):

@@ -5,7 +5,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FarmShare - Connect Surplus Produce with Communities</title>
+    <meta name="description" content="FarmShare connects surplus farm produce with NGOs and food banks to reduce waste and fight hunger.">
+    <!-- Existing styles -->
     <link rel="stylesheet" href="style.css">
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Tailwind CSS (for new components) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Override Tailwind preflight for non-Tailwind zones */
+        .leaflet-container { z-index: 1; }
+        #farmer-map, #ngo-map { height: 420px; border-radius: 12px; overflow: hidden; }
+        .stat-skeleton { animation: pulse 1.5s ease-in-out infinite; background: linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%); background-size: 400%; }
+        @keyframes pulse { 0%,100%{background-position:0%} 50%{background-position:100%} }
+        .loc-btn { display:inline-flex;align-items:center;gap:6px;font-size:0.8rem;padding:0.35rem 0.75rem;border-radius:6px;border:1px solid #16a34a;color:#16a34a;background:transparent;cursor:pointer;transition:all .2s; }
+        .loc-btn:hover { background:#16a34a;color:#fff; }
+    </style>
 </head>
 
 <body>
@@ -53,6 +69,18 @@
                     <div class="form-group">
                         <label for="auth-password">Password</label>
                         <input type="password" id="auth-password" class="form-control" placeholder="••••••••" required>
+                    </div>
+
+                    <!-- Registration location group -->
+                    <div class="form-group" id="reg-location-group" style="display: none;">
+                        <label>Your Location</label>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="text" id="reg-location-display" class="form-control" placeholder="Detecting..." readonly style="flex:1;">
+                            <button type="button" class="loc-btn" id="reg-detect-btn">📍 Detect</button>
+                        </div>
+                        <input type="hidden" id="reg-lat">
+                        <input type="hidden" id="reg-lng">
+                        <small id="reg-loc-status" style="color:#64748b;font-size:0.75rem;"></small>
                     </div>
 
                     <div class="form-group" id="role-group" style="display: none;">
@@ -137,8 +165,13 @@
 
                             <div class="form-group">
                                 <label for="produce-location">Pickup Location</label>
-                                <input type="text" id="produce-location" class="form-control" placeholder="City, Area"
-                                    required>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <input type="text" id="produce-location" class="form-control" placeholder="City, Area" required style="flex:1;">
+                                    <button type="button" class="loc-btn" id="produce-detect-btn">📍 Detect</button>
+                                </div>
+                                <input type="hidden" id="produce-lat">
+                                <input type="hidden" id="produce-lng">
+                                <small id="produce-loc-status" style="color:#64748b;font-size:0.75rem;"></small>
                             </div>
 
                             <div class="form-group">
@@ -163,6 +196,8 @@
                         <button class="tab-btn active" id="tab-farmer-listings">My Listings</button>
                         <button class="tab-btn" id="tab-farmer-requests">Incoming Requests</button>
                         <button class="tab-btn" id="tab-farmer-history">📦 History</button>
+                        <button class="tab-btn" id="tab-farmer-map">🗺️ Map</button>
+                        <button class="tab-btn" id="tab-farmer-stats">📊 Analytics</button>
                     </div>
 
                     <div id="farmer-listings-tab-content">
@@ -175,6 +210,20 @@
 
                     <div id="farmer-history-tab-content" style="display: none;">
                         <div class="produce-grid" id="farmer-history-list"></div>
+                    </div>
+
+                    <div id="farmer-map-tab-content" style="display: none;">
+                        <div class="p-4">
+                            <div id="farmer-map-legend" class="flex gap-4 mb-3 text-sm">
+                                <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#16a34a;"></span> Farmers</span>
+                                <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2563eb;"></span> NGOs</span>
+                            </div>
+                            <div id="farmer-map"></div>
+                        </div>
+                    </div>
+
+                    <div id="farmer-stats-tab-content" style="display: none;">
+                        <div id="farmer-stats-container" class="p-4"></div>
                     </div>
                 </div>
             </div>
@@ -208,6 +257,8 @@
                     <button class="tab-btn active" id="tab-ngo-browse">Browse Produce</button>
                     <button class="tab-btn" id="tab-ngo-requests">My Requests</button>
                     <button class="tab-btn" id="tab-ngo-history">📦 History</button>
+                    <button class="tab-btn" id="tab-ngo-map">🗺️ Map</button>
+                    <button class="tab-btn" id="tab-ngo-stats">📊 Analytics</button>
                 </div>
 
                 <div id="ngo-browse-tab-content">
@@ -220,6 +271,20 @@
 
                 <div id="ngo-history-tab-content" style="display: none;">
                     <div class="produce-grid" id="ngo-history-list"></div>
+                </div>
+
+                <div id="ngo-map-tab-content" style="display: none;">
+                    <div class="p-4">
+                        <div id="ngo-map-legend" class="flex gap-4 mb-3 text-sm">
+                            <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#16a34a;"></span> Farmers</span>
+                            <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2563eb;"></span> NGOs</span>
+                        </div>
+                        <div id="ngo-map"></div>
+                    </div>
+                </div>
+
+                <div id="ngo-stats-tab-content" style="display: none;">
+                    <div id="ngo-stats-container" class="p-4"></div>
                 </div>
             </div>
         </section>

@@ -150,18 +150,23 @@ def register(payload: UserRegister):
                     cur.execute(
                         """
                         UPDATE users
-                        SET name = %s, password_hash = %s, role = %s, otp_code = %s, otp_expires_at = NOW() + INTERVAL '10 minutes'
+                        SET name = %s, password_hash = %s, role = %s, otp_code = %s,
+                            otp_expires_at = NOW() + INTERVAL '10 minutes',
+                            latitude = %s, longitude = %s
                         WHERE email = %s
                         """,
-                        (payload.name, hashed, payload.role, otp, payload.email),
+                        (payload.name, hashed, payload.role, otp,
+                         payload.latitude, payload.longitude, payload.email),
                     )
             else:
                 cur.execute(
                     """
-                    INSERT INTO users (name, email, password_hash, role, is_verified, otp_code, otp_expires_at)
-                    VALUES (%s, %s, %s, %s, FALSE, %s, NOW() + INTERVAL '10 minutes')
+                    INSERT INTO users (name, email, password_hash, role, is_verified, otp_code,
+                                       otp_expires_at, latitude, longitude)
+                    VALUES (%s, %s, %s, %s, FALSE, %s, NOW() + INTERVAL '10 minutes', %s, %s)
                     """,
-                    (payload.name, payload.email, hashed, payload.role, otp),
+                    (payload.name, payload.email, hashed, payload.role, otp,
+                     payload.latitude, payload.longitude),
                 )
 
     send_otp_email(payload.email, otp)
