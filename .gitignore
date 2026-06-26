@@ -9,3 +9,12 @@ env/
 dist/
 build/
 .DS_Store
+
+# dependencies
+node_modules/
+.expo/
+
+# native build folders
+ios/
+android/
+
