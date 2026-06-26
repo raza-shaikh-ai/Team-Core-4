@@ -4,12 +4,12 @@ import smtplib
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from passlib.context import CryptContext
 import psycopg2.extras
 
 from app.database import get_db
-from app.dependencies import create_access_token
+from app.dependencies import create_access_token, get_current_user
 from app.models.user import UserRegister, UserLogin, TokenResponse, UserOut, VerifyOTP
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -238,3 +238,32 @@ def login(payload: UserLogin):
         access_token=token,
         user=UserOut(**user)
     )
+
+
+# ---------------------------------------------------------------------------
+# Location update endpoint
+# ---------------------------------------------------------------------------
+
+from pydantic import BaseModel
+
+class UpdateLocation(BaseModel):
+    latitude: float
+    longitude: float
+
+
+@router.patch("/location", status_code=200)
+def update_location(
+    payload: UpdateLocation,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Store the user's latest coordinates.
+    Called by the frontend after geolocation is obtained on NGO login.
+    """
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE users SET latitude = %s, longitude = %s WHERE id = %s",
+                (payload.latitude, payload.longitude, current_user["id"]),
+            )
+    return {"message": "Location updated successfully"}

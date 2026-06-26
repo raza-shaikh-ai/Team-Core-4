@@ -615,11 +615,22 @@ async function loadNgoDashboard() {
     // Attempt to get live geolocation first
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-            (position) => {
+            async (position) => {
                 ngoCurrentCoords = {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude
                 };
+                // Persist latest NGO location to backend (for notifications)
+                try {
+                    await fetch(`${API_BASE}/auth/location`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ latitude: ngoCurrentCoords.lat, longitude: ngoCurrentCoords.lng })
+                    });
+                } catch (e) { console.warn('Could not update location:', e); }
                 loadNgoBrowse();
                 loadNgoRequests();
             },
