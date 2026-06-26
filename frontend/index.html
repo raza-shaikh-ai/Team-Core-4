@@ -215,6 +215,19 @@
                 <aside class="dashboard-sidebar">
                     <div class="panel-card">
                         <h3 class="panel-title" data-i18n="share_produce_title">🌾 Share Surplus Produce</h3>
+
+                        <!-- AI Voice Autofill Strip -->
+                        <div id="inline-voice-strip" class="inline-voice-strip" style="display:none;">
+                            <div class="inline-voice-strip-inner">
+                                <span class="inline-voice-icon">🤖</span>
+                                <span class="inline-voice-label">HarvestLink AI — just say what you have</span>
+                                <button id="inline-voice-btn" class="inline-voice-record-btn" title="Speak to autofill form">
+                                    <span id="inline-voice-btn-icon">🎙️</span>
+                                    <span id="inline-voice-btn-label">Speak</span>
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="panel-card-body">
                             <form id="upload-produce-form">
                                 <div class="form-group">
@@ -388,6 +401,7 @@
 
     <script src="translations.js"></script>
     <script src="app.js"></script>
+    <script src="ai-chat.js"></script>
 </body>
 
 </html>

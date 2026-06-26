@@ -11,7 +11,6 @@ router = APIRouter(prefix="/map", tags=["Map"])
 def get_map_data(current_user: dict = Depends(get_current_user)):
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            # Farmers with their active produce listings
             cur.execute("""
                 SELECT
                     u.id AS user_id,
@@ -32,7 +31,6 @@ def get_map_data(current_user: dict = Depends(get_current_user)):
             """)
             produce_rows = cur.fetchall()
 
-            # NGO users with coordinates
             cur.execute("""
                 SELECT id, name, latitude, longitude
                 FROM users

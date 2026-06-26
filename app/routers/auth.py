@@ -240,9 +240,6 @@ def login(payload: UserLogin):
     )
 
 
-# ---------------------------------------------------------------------------
-# Location update endpoint
-# ---------------------------------------------------------------------------
 
 from pydantic import BaseModel
 
@@ -256,10 +253,6 @@ def update_location(
     payload: UpdateLocation,
     current_user: dict = Depends(get_current_user),
 ):
-    """
-    Store the user's latest coordinates.
-    Called by the frontend after geolocation is obtained on NGO login.
-    """
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(

@@ -15,9 +15,6 @@ from app.models.produce import ProduceCreate, ProduceUpdate, ProduceOut
 router = APIRouter(prefix="/produce", tags=["Produce"])
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _haversine_km(lat1, lon1, lat2, lon2) -> float:
     R = 6371.0
@@ -30,7 +27,6 @@ def _haversine_km(lat1, lon1, lat2, lon2) -> float:
 
 
 def _send_ngo_notification(ngo_email: str, ngo_name: str, produce: dict, distance_km: float, farmer_name: str):
-    """Send a produce availability notification email to a single NGO."""
     smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER")
@@ -148,14 +144,10 @@ def _send_ngo_notification(ngo_email: str, ngo_name: str, produce: dict, distanc
 
 
 def notify_nearby_ngos(produce: dict, farmer_name: str):
-    """
-    Find all verified NGOs within 100 km of the produce location
-    and send them an email notification. Runs in a background thread.
-    """
     produce_lat = produce.get("latitude")
     produce_lng = produce.get("longitude")
     if produce_lat is None or produce_lng is None:
-        return  # No coordinates — skip notification
+        return
 
     try:
         with get_db() as conn:
@@ -220,7 +212,6 @@ def create_produce(
     row["farmer_name"] = current_user["name"]
     result = _row_to_produce(row)
 
-    # Fire-and-forget: notify nearby NGOs in background (non-blocking)
     produce_dict = {
         "produce_name": row["produce_name"],
         "quantity":     float(row["quantity"]),
