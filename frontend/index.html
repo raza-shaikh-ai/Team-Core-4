@@ -4,200 +4,274 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FarmShare - Connect Surplus Produce with Communities</title>
-    <meta name="description" content="FarmShare connects surplus farm produce with NGOs and food banks to reduce waste and fight hunger.">
-    <!-- Existing styles -->
+    <title>FarmShare — Connect Surplus Produce with Communities</title>
+    <meta name="description" content="FarmShare connects surplus farm produce with NGOs and food banks to reduce food waste and fight hunger in communities.">
+    <meta name="theme-color" content="#059669">
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Main Stylesheet -->
     <link rel="stylesheet" href="style.css">
+
     <!-- Leaflet.js -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Tailwind CSS (for new components) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Override Tailwind preflight for non-Tailwind zones */
-        .leaflet-container { z-index: 1; }
-        #farmer-map, #ngo-map { height: 420px; border-radius: 12px; overflow: hidden; }
-        .stat-skeleton { animation: pulse 1.5s ease-in-out infinite; background: linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%); background-size: 400%; }
-        @keyframes pulse { 0%,100%{background-position:0%} 50%{background-position:100%} }
-        .loc-btn { display:inline-flex;align-items:center;gap:6px;font-size:0.8rem;padding:0.35rem 0.75rem;border-radius:6px;border:1px solid #16a34a;color:#16a34a;background:transparent;cursor:pointer;transition:all .2s; }
-        .loc-btn:hover { background:#16a34a;color:#fff; }
-    </style>
 </head>
 
 <body>
 
+    <!-- =====================================================
+         HEADER
+         ===================================================== -->
     <header class="app-header">
         <div class="header-container">
             <a href="#" class="logo-wrapper" id="header-logo">
                 <span class="logo-icon">🌾</span>
-                <span>FarmShare</span>
+                <span class="logo-text" data-i18n="logo_text">FarmShare</span>
             </a>
-            <nav class="user-nav" id="user-nav" style="display: none;">
-                <div class="user-profile">
-                    <div class="avatar" id="user-avatar">-</div>
-                    <div class="profile-info">
-                        <span class="profile-name" id="user-name">Loading...</span>
-                        <span class="profile-role" id="user-role-label">Role</span>
-                    </div>
+
+            <div class="header-right">
+                <div class="lang-selector-wrapper">
+                    <select id="lang-selector" class="lang-selector">
+                        <option value="en">English</option>
+                        <option value="hi">हिंदी</option>
+                        <option value="mr">मराठी</option>
+                        <option value="te">తెలుగు</option>
+                        <option value="kn">ಕನ್ನಡ</option>
+                    </select>
                 </div>
-                <button class="btn btn-secondary" id="logout-btn">Logout</button>
-            </nav>
+
+                <nav class="user-nav" id="user-nav" style="display: none;">
+                    <div class="user-profile">
+                        <div class="avatar" id="user-avatar">-</div>
+                        <div class="profile-info">
+                            <span class="profile-name" id="user-name">Loading...</span>
+                            <span class="profile-role"><span data-i18n="role_label">Role</span>: <span id="user-role-label">Role</span></span>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" id="logout-btn" data-i18n="logout">Logout</button>
+                </nav>
+            </div>
         </div>
     </header>
 
+    <!-- =====================================================
+         MAIN CONTENT
+         ===================================================== -->
     <main class="main-content">
 
+        <!-- AUTH VIEW — Split Layout -->
         <section id="auth-view" class="view-section active">
-            <div class="auth-card">
-                <div class="auth-header">
-                    <h2 id="auth-title">Welcome to FarmShare</h2>
-                    <p id="auth-subtitle">Login to connect surplus produce with those in need</p>
+            <div class="auth-split-card">
+
+                <!-- LEFT: Form Panel -->
+                <div class="auth-split-left">
+                    <div class="auth-split-logo">
+                        <span>🌾</span>
+                        <span class="logo-text" data-i18n="logo_text">FarmShare</span>
+                    </div>
+
+                    <div class="auth-header">
+                        <p class="auth-welcome-label" data-i18n="auth_welcome_label">Welcome</p>
+                        <h2 id="auth-title" data-i18n="login_title">Log In</h2>
+                        <p class="auth-sub" id="auth-subtitle" data-i18n="login_subtitle">Connect surplus produce with communities</p>
+                    </div>
+
+                    <form id="auth-form">
+                        <!-- Name (registration only) -->
+                        <div class="form-group" id="name-group" style="display: none;">
+                            <label for="reg-name" data-i18n="label_fullname">Full Name</label>
+                            <input type="text" id="reg-name" class="form-control" placeholder="Enter your full name" data-i18n-placeholder="placeholder_fullname">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="auth-email" data-i18n="label_email">Your Email</label>
+                            <input type="email" id="auth-email" class="form-control" placeholder="Your email" data-i18n-placeholder="placeholder_email" required autocomplete="email">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="auth-password" data-i18n="label_password">Password</label>
+                            <input type="password" id="auth-password" class="form-control" placeholder="Your password" data-i18n-placeholder="placeholder_password" required autocomplete="current-password">
+                        </div>
+
+                        <!-- Location (registration only) -->
+                        <div class="form-group" id="reg-location-group" style="display: none;">
+                            <label data-i18n="label_location">Your Location</label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="text" id="reg-location-display" class="form-control" placeholder="Detecting location…" data-i18n-placeholder="placeholder_location" readonly style="flex:1;">
+                                <button type="button" class="loc-btn" id="reg-detect-btn" data-i18n="btn_detect">📍 Detect</button>
+                            </div>
+                            <input type="hidden" id="reg-lat">
+                            <input type="hidden" id="reg-lng">
+                            <small id="reg-loc-status" style="color:var(--text-muted);font-size:0.73rem;margin-top:4px;display:block;"></small>
+                        </div>
+
+                        <!-- Role (registration only) -->
+                        <div class="form-group" id="role-group" style="display: none;">
+                            <label data-i18n="label_role">Select Your Role</label>
+                            <div class="role-selector">
+                                <div class="role-option">
+                                    <input type="radio" id="role-farmer" name="user-role" value="Farmer" checked>
+                                    <label for="role-farmer" class="role-label">
+                                        <span class="role-icon">👨‍🌾</span>
+                                        <span class="role-name" data-i18n="role_farmer">Farmer</span>
+                                    </label>
+                                </div>
+                                <div class="role-option">
+                                    <input type="radio" id="role-ngo" name="user-role" value="NGO">
+                                    <label for="role-ngo" class="role-label">
+                                        <span class="role-icon">🏢</span>
+                                        <span class="role-name" data-i18n="role_ngo">NGO / Food Bank</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="width:100%;padding:0.875rem;font-size:0.95rem;margin-top:0.5rem;" id="auth-submit-btn" data-i18n="btn_login">
+                            Log In
+                        </button>
+                    </form>
+
+                    <div class="auth-footer">
+                        <span id="auth-toggle-text" data-i18n="toggle_text_login">Don't have an account?</span>
+                        <a href="#" id="auth-toggle-link" data-i18n="toggle_link_login">Register here</a>
+                    </div>
                 </div>
 
-                <form id="auth-form">
-                    <div class="form-group" id="name-group" style="display: none;">
-                        <label for="reg-name">Full Name</label>
-                        <input type="text" id="reg-name" class="form-control" placeholder="Enter your full name">
+                <!-- RIGHT: Illustration Panel -->
+                <div class="auth-split-right">
+                    <div class="auth-panel-header">
+                        <span class="auth-panel-brand">🌾 FarmShare</span>
+                        <span class="auth-panel-badge">Platform</span>
                     </div>
 
-                    <div class="form-group">
-                        <label for="auth-email">Email Address</label>
-                        <input type="email" id="auth-email" class="form-control" placeholder="name@example.com"
-                            required>
+                    <img src="farmers.png" alt="Farmers sharing produce" class="auth-panel-illustration" onerror="this.style.display='none'">
+
+                    <div class="auth-panel-text">
+                        <h2><span data-i18n="illustration_title_1">Get the best</span><br><strong data-i18n="illustration_title_2">fresh produce</strong></h2>
+                        <p data-i18n="illustration_body">Connect surplus farm produce with NGOs and food banks to reduce waste and fight hunger — together.</p>
                     </div>
 
-                    <div class="form-group">
-                        <label for="auth-password">Password</label>
-                        <input type="password" id="auth-password" class="form-control" placeholder="••••••••" required>
-                    </div>
-
-                    <!-- Registration location group -->
-                    <div class="form-group" id="reg-location-group" style="display: none;">
-                        <label>Your Location</label>
-                        <div style="display:flex;gap:8px;align-items:center;">
-                            <input type="text" id="reg-location-display" class="form-control" placeholder="Detecting..." readonly style="flex:1;">
-                            <button type="button" class="loc-btn" id="reg-detect-btn">📍 Detect</button>
-                        </div>
-                        <input type="hidden" id="reg-lat">
-                        <input type="hidden" id="reg-lng">
-                        <small id="reg-loc-status" style="color:#64748b;font-size:0.75rem;"></small>
-                    </div>
-
-                    <div class="form-group" id="role-group" style="display: none;">
-                        <label>Select Your Role</label>
-                        <div class="role-selector">
-                            <div class="role-option">
-                                <input type="radio" id="role-farmer" name="user-role" value="Farmer" checked>
-                                <label for="role-farmer" class="role-label">
-                                    <span class="role-icon">👨‍🌾</span>
-                                    <span class="role-name">Farmer</span>
-                                </label>
-                            </div>
-                            <div class="role-option">
-                                <input type="radio" id="role-ngo" name="user-role" value="NGO">
-                                <label for="role-ngo" class="role-label">
-                                    <span class="role-icon">🏢</span>
-                                    <span class="role-name">NGO / Food Bank</span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.85rem;"
-                        id="auth-submit-btn">Login</button>
-                </form>
-
-                <div class="auth-footer">
-                    <span id="auth-toggle-text">Don't have an account?</span>
-                    <a href="#" id="auth-toggle-link">Register here</a>
+                    <!-- Decorative floating orbs -->
+                    <div class="auth-orb auth-orb-1"></div>
+                    <div class="auth-orb auth-orb-2"></div>
+                    <div class="auth-orb auth-orb-3"></div>
                 </div>
+
             </div>
         </section>
 
+        <!-- OTP VERIFICATION VIEW -->
         <section id="otp-view" class="view-section">
             <div class="auth-card">
+                <div class="auth-logo">
+                    <span class="auth-logo-icon">✉️</span>
+                    <span class="auth-logo-name" data-i18n="verify_email">Verify Email</span>
+                </div>
+
                 <div class="auth-header">
-                    <h2>Verify Your Email</h2>
-                    <p>We've sent a 6-digit OTP code to your registered email address.</p>
+                    <h2 data-i18n="otp_title">Check Your Inbox</h2>
+                    <p data-i18n="otp_subtitle">We've sent a 6-digit OTP code to your registered email address. Please enter it below.</p>
                 </div>
 
                 <form id="otp-form">
                     <input type="hidden" id="otp-email">
 
                     <div class="form-group">
-                        <label for="otp-code">One-Time Password (OTP)</label>
-                        <input type="text" id="otp-code" class="form-control" placeholder="123456" minlength="6"
-                            maxlength="6" pattern="\d{6}" required>
+                        <label for="otp-code" data-i18n="label_otp">One-Time Password (OTP)</label>
+                        <input
+                            type="text"
+                            id="otp-code"
+                            class="form-control"
+                            placeholder="123456"
+                            minlength="6"
+                            maxlength="6"
+                            pattern="\d{6}"
+                            required
+                            style="text-align:center;font-size:1.75rem;letter-spacing:0.6rem;font-weight:700;padding:0.875rem;"
+                            autocomplete="one-time-code"
+                            inputmode="numeric"
+                        >
                     </div>
 
-                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.85rem;"
-                        id="otp-submit-btn">Verify Code</button>
+                    <button type="submit" class="btn btn-primary" style="width:100%;padding:0.875rem;font-size:0.95rem;" id="otp-submit-btn" data-i18n="btn_verify">
+                        Verify Code
+                    </button>
                 </form>
 
                 <div class="auth-footer">
-                    <a href="#" id="otp-back-link">Back to Login</a>
+                    <a href="#" id="otp-back-link" data-i18n="btn_back_to_login">← Back to Login</a>
                 </div>
             </div>
         </section>
 
+        <!-- FARMER DASHBOARD -->
         <section id="farmer-view" class="view-section">
             <div class="dashboard-layout">
+
+                <!-- Sidebar: Submit Produce Form -->
                 <aside class="dashboard-sidebar">
                     <div class="panel-card">
-                        <h3 class="panel-title">🌾 Share Surplus</h3>
-                        <form id="upload-produce-form">
-                            <div class="form-group">
-                                <label for="produce-name">Produce Name</label>
-                                <input type="text" id="produce-name" class="form-control"
-                                    placeholder="e.g. Tomatoes, Potatoes" required>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="produce-quantity">Quantity (kg)</label>
-                                <input type="number" id="produce-quantity" step="0.1" class="form-control"
-                                    placeholder="e.g. 50" required>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="produce-date">Harvest Date</label>
-                                <input type="date" id="produce-date" class="form-control" required>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="produce-location">Pickup Location</label>
-                                <div style="display:flex;gap:8px;align-items:center;">
-                                    <input type="text" id="produce-location" class="form-control" placeholder="City, Area" required style="flex:1;">
-                                    <button type="button" class="loc-btn" id="produce-detect-btn">📍 Detect</button>
+                        <h3 class="panel-title" data-i18n="share_produce_title">🌾 Share Surplus Produce</h3>
+                        <div class="panel-card-body">
+                            <form id="upload-produce-form">
+                                <div class="form-group">
+                                    <label for="produce-name" data-i18n="label_produce_name">Produce Name</label>
+                                    <input type="text" id="produce-name" class="form-control"
+                                        placeholder="e.g. Tomatoes, Potatoes" data-i18n-placeholder="placeholder_produce_name" required>
                                 </div>
-                                <input type="hidden" id="produce-lat">
-                                <input type="hidden" id="produce-lng">
-                                <small id="produce-loc-status" style="color:#64748b;font-size:0.75rem;"></small>
-                            </div>
 
-                            <div class="form-group">
-                                <label>Produce Image (Optional)</label>
-                                <div class="file-upload-wrapper">
-                                    <span>Click to upload image</span>
-                                    <input type="file" id="produce-image-file" class="file-upload-input"
-                                        accept="image/*">
-                                    <input type="hidden" id="produce-image-url">
+                                <div class="form-group">
+                                    <label for="produce-quantity" data-i18n="label_quantity">Quantity (kg)</label>
+                                    <input type="number" id="produce-quantity" step="0.1" class="form-control"
+                                        placeholder="e.g. 50" data-i18n-placeholder="placeholder_quantity" min="0.1" required>
                                 </div>
-                                <img id="image-upload-preview" class="file-upload-preview" alt="Upload preview">
-                            </div>
 
-                            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;"
-                                id="submit-produce-btn">Submit Listing</button>
-                        </form>
+                                <div class="form-group">
+                                    <label for="produce-date" data-i18n="label_harvest_date">Harvest Date</label>
+                                    <input type="date" id="produce-date" class="form-control" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="produce-location" data-i18n="label_pickup_location">Pickup Location</label>
+                                    <div style="display:flex;gap:8px;align-items:center;">
+                                        <input type="text" id="produce-location" class="form-control"
+                                            placeholder="City, Area" data-i18n-placeholder="placeholder_pickup_location" required style="flex:1;">
+                                        <button type="button" class="loc-btn" id="produce-detect-btn" data-i18n="btn_detect">📍 Detect</button>
+                                    </div>
+                                    <input type="hidden" id="produce-lat">
+                                    <input type="hidden" id="produce-lng">
+                                    <small id="produce-loc-status" style="color:var(--text-muted);font-size:0.73rem;margin-top:4px;display:block;"></small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label><span data-i18n="label_produce_image">Produce Image</span> <span style="font-weight:400;text-transform:none;font-size:0.75rem;color:var(--text-light);" data-i18n="label_optional">(optional)</span></label>
+                                    <div class="file-upload-wrapper">
+                                        <span data-i18n="image_upload_prompt">📷 Click to upload image</span>
+                                        <input type="file" id="produce-image-file" class="file-upload-input" accept="image/*">
+                                        <input type="hidden" id="produce-image-url">
+                                    </div>
+                                    <img id="image-upload-preview" class="file-upload-preview" alt="Upload preview">
+                                </div>
+
+                                <button type="submit" class="btn btn-primary" style="width:100%;margin-top:0.5rem;" id="submit-produce-btn" data-i18n="btn_submit_listing">
+                                    Submit Listing
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </aside>
 
+                <!-- Main Content: Tabs -->
                 <div class="dashboard-main">
                     <div class="tabs-nav">
-                        <button class="tab-btn active" id="tab-farmer-listings">My Listings</button>
-                        <button class="tab-btn" id="tab-farmer-requests">Incoming Requests</button>
-                        <button class="tab-btn" id="tab-farmer-history">📦 History</button>
-                        <button class="tab-btn" id="tab-farmer-map">🗺️ Map</button>
-                        <button class="tab-btn" id="tab-farmer-stats">📊 Analytics</button>
+                        <button class="tab-btn active" id="tab-farmer-listings" data-i18n="tab_my_listings">📋 My Listings</button>
+                        <button class="tab-btn" id="tab-farmer-requests" data-i18n="tab_incoming_requests">📥 Requests</button>
+                        <button class="tab-btn" id="tab-farmer-history" data-i18n="tab_history">📦 History</button>
+                        <button class="tab-btn" id="tab-farmer-map" data-i18n="tab_map">🗺️ Map</button>
+                        <button class="tab-btn" id="tab-farmer-stats" data-i18n="tab_analytics">📊 Analytics</button>
                     </div>
 
                     <div id="farmer-listings-tab-content">
@@ -213,52 +287,63 @@
                     </div>
 
                     <div id="farmer-map-tab-content" style="display: none;">
-                        <div class="p-4">
-                            <div id="farmer-map-legend" class="flex gap-4 mb-3 text-sm">
-                                <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#16a34a;"></span> Farmers</span>
-                                <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2563eb;"></span> NGOs</span>
+                        <div class="map-container">
+                            <div id="farmer-map-legend" class="map-legend">
+                                <span class="map-legend-item">
+                                    <span class="map-legend-dot" style="background:#16a34a;"></span>
+                                    <span data-i18n="legend_farmers">Farmers</span>
+                                </span>
+                                <span class="map-legend-item">
+                                    <span class="map-legend-dot" style="background:#2563eb;"></span>
+                                    <span data-i18n="legend_ngos">NGOs</span>
+                                </span>
                             </div>
                             <div id="farmer-map"></div>
                         </div>
                     </div>
 
                     <div id="farmer-stats-tab-content" style="display: none;">
-                        <div id="farmer-stats-container" class="p-4"></div>
+                        <div id="farmer-stats-container" class="stats-container"></div>
                     </div>
                 </div>
+
             </div>
         </section>
 
+        <!-- NGO DASHBOARD -->
         <section id="ngo-view" class="view-section">
             <div class="dashboard-main">
+
+                <!-- Filter Bar -->
                 <div class="filter-bar">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label for="filter-name">Produce Name</label>
-                        <input type="text" id="filter-name" class="form-control" placeholder="Search produce...">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="filter-name" data-i18n="filter_label_name">Produce Name</label>
+                        <input type="text" id="filter-name" class="form-control" placeholder="Search produce…" data-i18n-placeholder="placeholder_search_produce">
                     </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label for="filter-location">Location</label>
-                        <input type="text" id="filter-location" class="form-control" placeholder="Search location...">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="filter-location" data-i18n="filter_label_location">Location</label>
+                        <input type="text" id="filter-location" class="form-control" placeholder="Search location…" data-i18n-placeholder="placeholder_search_location">
                     </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label for="filter-status">Status</label>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="filter-status" data-i18n="filter_label_status">Status</label>
                         <select id="filter-status" class="form-control">
-                            <option value="">All Statuses</option>
-                            <option value="available" selected>Available</option>
-                            <option value="requested">Requested</option>
-                            <option value="pickup_scheduled">Pickup Scheduled</option>
-                            <option value="delivered">Delivered</option>
+                            <option value="" data-i18n="status_option_all">All Statuses</option>
+                            <option value="available" data-i18n="status_available" selected>Available</option>
+                            <option value="requested" data-i18n="status_requested">Requested</option>
+                            <option value="pickup_scheduled" data-i18n="status_pickup_scheduled">Pickup Scheduled</option>
+                            <option value="delivered" data-i18n="status_delivered">Delivered</option>
                         </select>
                     </div>
-                    <button class="btn btn-primary" id="apply-filters-btn">Search</button>
+                    <button class="btn btn-primary" id="apply-filters-btn" data-i18n="btn_search">🔍 Search</button>
                 </div>
 
-                <div class="tabs-nav" style="margin-top: 1.5rem;">
-                    <button class="tab-btn active" id="tab-ngo-browse">Browse Produce</button>
-                    <button class="tab-btn" id="tab-ngo-requests">My Requests</button>
-                    <button class="tab-btn" id="tab-ngo-history">📦 History</button>
-                    <button class="tab-btn" id="tab-ngo-map">🗺️ Map</button>
-                    <button class="tab-btn" id="tab-ngo-stats">📊 Analytics</button>
+                <!-- Tabs -->
+                <div class="tabs-nav">
+                    <button class="tab-btn active" id="tab-ngo-browse" data-i18n="tab_browse_produce">🛒 Browse Produce</button>
+                    <button class="tab-btn" id="tab-ngo-requests" data-i18n="tab_my_requests">📋 My Requests</button>
+                    <button class="tab-btn" id="tab-ngo-history" data-i18n="tab_history">📦 History</button>
+                    <button class="tab-btn" id="tab-ngo-map" data-i18n="tab_map">🗺️ Map</button>
+                    <button class="tab-btn" id="tab-ngo-stats" data-i18n="tab_analytics">📊 Analytics</button>
                 </div>
 
                 <div id="ngo-browse-tab-content">
@@ -274,25 +359,34 @@
                 </div>
 
                 <div id="ngo-map-tab-content" style="display: none;">
-                    <div class="p-4">
-                        <div id="ngo-map-legend" class="flex gap-4 mb-3 text-sm">
-                            <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#16a34a;"></span> Farmers</span>
-                            <span class="flex items-center gap-1"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2563eb;"></span> NGOs</span>
+                    <div class="map-container">
+                        <div id="ngo-map-legend" class="map-legend">
+                            <span class="map-legend-item">
+                                <span class="map-legend-dot" style="background:#16a34a;"></span>
+                                <span data-i18n="legend_farmers">Farmers</span>
+                            </span>
+                            <span class="map-legend-item">
+                                <span class="map-legend-dot" style="background:#2563eb;"></span>
+                                <span data-i18n="legend_ngos">NGOs</span>
+                            </span>
                         </div>
                         <div id="ngo-map"></div>
                     </div>
                 </div>
 
                 <div id="ngo-stats-tab-content" style="display: none;">
-                    <div id="ngo-stats-container" class="p-4"></div>
+                    <div id="ngo-stats-container" class="stats-container"></div>
                 </div>
+
             </div>
         </section>
 
     </main>
 
+    <!-- Toast Notifications -->
     <div class="toast-container" id="toast-container"></div>
 
+    <script src="translations.js"></script>
     <script src="app.js"></script>
 </body>
 

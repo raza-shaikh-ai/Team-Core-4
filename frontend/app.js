@@ -1,6 +1,5 @@
-const API_BASE = 'http://localhost:8000';
-//const API_BASE = 'http://13.234.42.87:8000';
-
+// const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://13.234.42.87:8000';
 
 let token = localStorage.getItem('token') || null;
 let currentUser = null;
@@ -9,6 +8,94 @@ try {
     if (savedUser) currentUser = JSON.parse(savedUser);
 } catch (e) {
     localStorage.removeItem('user');
+}
+
+let currentLang = localStorage.getItem('lang') || 'en';
+
+function setLanguage(lang) {
+    if (!TRANSLATIONS[lang]) return;
+    currentLang = lang;
+    localStorage.setItem('lang', lang);
+    document.documentElement.lang = lang;
+
+    const langSelector = document.getElementById('lang-selector');
+    if (langSelector) {
+        langSelector.value = lang;
+    }
+
+    // Static translations
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (TRANSLATIONS[lang][key]) {
+            el.textContent = TRANSLATIONS[lang][key];
+        }
+    });
+
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (TRANSLATIONS[lang][key]) {
+            el.placeholder = TRANSLATIONS[lang][key];
+        }
+    });
+
+    updateAuthToggleTexts();
+    refreshActiveViewContent();
+}
+
+function updateAuthToggleTexts() {
+    const dict = TRANSLATIONS[currentLang];
+    if (!dict) return;
+    const authTitle = document.getElementById('auth-title');
+    const authSubtitle = document.getElementById('auth-subtitle');
+    const authSubmitBtn = document.getElementById('auth-submit-btn');
+    const authToggleText = document.getElementById('auth-toggle-text');
+    const authToggleLink = document.getElementById('auth-toggle-link');
+
+    if (isRegisterMode) {
+        if (authTitle) authTitle.textContent = dict.register_title;
+        if (authSubtitle) authSubtitle.textContent = dict.register_subtitle;
+        if (authSubmitBtn) authSubmitBtn.textContent = dict.btn_register;
+        if (authToggleText) authToggleText.textContent = dict.toggle_text_register;
+        if (authToggleLink) authToggleLink.textContent = dict.toggle_link_register;
+    } else {
+        if (authTitle) authTitle.textContent = dict.login_title;
+        if (authSubtitle) authSubtitle.textContent = dict.login_subtitle;
+        if (authSubmitBtn) authSubmitBtn.textContent = dict.btn_login;
+        if (authToggleText) authToggleText.textContent = dict.toggle_text_login;
+        if (authToggleLink) authToggleLink.textContent = dict.toggle_link_login;
+    }
+}
+
+function refreshActiveViewContent() {
+    if (authView && authView.classList.contains('active')) {
+        updateAuthToggleTexts();
+    }
+    if (farmerView && farmerView.classList.contains('active')) {
+        if (tabFarmerListings.classList.contains('active')) {
+            loadFarmerListings();
+        } else if (tabFarmerRequests.classList.contains('active')) {
+            loadFarmerRequests();
+        } else if (tabFarmerHistory.classList.contains('active')) {
+            loadFarmerHistory();
+        } else if (tabFarmerMap.classList.contains('active')) {
+            loadMap('Farmer');
+        } else if (tabFarmerStats.classList.contains('active')) {
+            loadFarmerStats();
+        }
+    }
+    if (ngoView && ngoView.classList.contains('active')) {
+        if (tabNgoBrowse.classList.contains('active')) {
+            loadNgoBrowse();
+        } else if (tabNgoRequests.classList.contains('active')) {
+            loadNgoRequests();
+        } else if (tabNgoHistory.classList.contains('active')) {
+            loadNgoHistory();
+        } else if (tabNgoMap.classList.contains('active')) {
+            loadMap('NGO');
+        } else if (tabNgoStats.classList.contains('active')) {
+            loadNgoStats();
+        }
+    }
 }
 
 const authView = document.getElementById('auth-view');
@@ -130,7 +217,15 @@ function updateHeader() {
     if (currentUser) {
         userAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
         userName.textContent = currentUser.name;
-        userRoleLabel.textContent = currentUser.role;
+        let roleText = currentUser.role;
+        if (TRANSLATIONS[currentLang]) {
+            if (currentUser.role === 'Farmer') {
+                roleText = TRANSLATIONS[currentLang].role_farmer || currentUser.role;
+            } else if (currentUser.role === 'NGO' || currentUser.role === 'Food Bank') {
+                roleText = TRANSLATIONS[currentLang].role_ngo || currentUser.role;
+            }
+        }
+        userRoleLabel.textContent = roleText;
     }
 }
 
@@ -139,7 +234,8 @@ function handleLogout() {
     currentUser = null;
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    showToast('Logged out successfully', 'info');
+    const msg = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_logged_out) || 'Logged out successfully';
+    showToast(msg, 'info');
     showView('auth');
 }
 
@@ -148,26 +244,17 @@ authToggleLink.addEventListener('click', (e) => {
     isRegisterMode = !isRegisterMode;
 
     if (isRegisterMode) {
-        authTitle.textContent = 'Create an Account';
-        authSubtitle.textContent = 'Register to join the surplus distribution network';
         nameGroup.style.display = 'block';
         roleGroup.style.display = 'block';
         document.getElementById('reg-location-group').style.display = 'block';
-        authSubmitBtn.textContent = 'Register';
-        authToggleText.textContent = 'Already have an account?';
-        authToggleLink.textContent = 'Login here';
         regNameInput.required = true;
     } else {
-        authTitle.textContent = 'Welcome to FarmShare';
-        authSubtitle.textContent = 'Login to connect surplus produce with those in need';
         nameGroup.style.display = 'none';
         roleGroup.style.display = 'none';
         document.getElementById('reg-location-group').style.display = 'none';
-        authSubmitBtn.textContent = 'Login';
-        authToggleText.textContent = "Don't have an account?";
-        authToggleLink.textContent = 'Register here';
         regNameInput.required = false;
     }
+    updateAuthToggleTexts();
 });
 
 authForm.addEventListener('submit', async (e) => {
@@ -199,7 +286,7 @@ authForm.addEventListener('submit', async (e) => {
             const data = await response.json();
             otpEmailInput.value = email;
             otpCodeInput.value = '';
-            showToast(data.message || 'OTP verification code sent');
+            showToast(data.message || (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_otp_sent) || 'OTP verification code sent');
             showView('otp');
         } else {
             const response = await fetch(`${API_BASE}/auth/login`, {
@@ -225,7 +312,8 @@ authForm.addEventListener('submit', async (e) => {
             currentUser = data.user;
             localStorage.setItem('token', token);
             localStorage.setItem('user', JSON.stringify(currentUser));
-            showToast('Welcome back, ' + currentUser.name);
+            const welcomeMsg = ((TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_welcome_back) || 'Welcome back, ') + currentUser.name;
+            showToast(welcomeMsg);
             showView(currentUser.role);
         }
     } catch (err) {
@@ -255,7 +343,8 @@ otpForm.addEventListener('submit', async (e) => {
         currentUser = data.user;
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(currentUser));
-        showToast('Verification successful! Welcome, ' + currentUser.name);
+        const verifiedMsg = ((TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_welcome_user) || 'Verification successful! Welcome, ') + currentUser.name;
+        showToast(verifiedMsg);
         showView(currentUser.role);
     } catch (err) {
         showToast(err.message, 'error');
@@ -281,11 +370,11 @@ produceImageFile.addEventListener('change', async () => {
     
     // Disable submit and show uploading state
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Uploading image...';
+    submitBtn.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_uploading_image) || 'Uploading image...';
     submitBtn.style.opacity = '0.6';
     submitBtn.style.cursor = 'not-allowed';
     
-    uploadLabel.textContent = 'Uploading to cloud... ⏳';
+    uploadLabel.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_uploading_cloud) || 'Uploading to cloud... ⏳';
 
     try {
         const response = await fetch(`${API_BASE}/upload/image`, {
@@ -305,16 +394,16 @@ produceImageFile.addEventListener('change', async () => {
         produceImageUrl.value = data.url;
         imageUploadPreview.src = data.url;
         imageUploadPreview.style.display = 'block';
-        showToast('Image uploaded successfully');
-        uploadLabel.textContent = 'Change selected image';
+        showToast((TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_image_success) || 'Image uploaded successfully');
+        uploadLabel.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_upload_change) || 'Change selected image';
     } catch (err) {
         showToast(err.message, 'error');
-        uploadLabel.textContent = 'Upload failed. Click to try again.';
+        uploadLabel.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_upload_fail) || 'Upload failed. Click to try again.';
         produceImageUrl.value = '';
         imageUploadPreview.style.display = 'none';
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Listing';
+        submitBtn.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].btn_submit_listing) || 'Submit Listing';
         submitBtn.style.opacity = '1';
         submitBtn.style.cursor = 'pointer';
     }
@@ -351,13 +440,13 @@ uploadProduceForm.addEventListener('submit', async (e) => {
             throw new Error(err.detail || 'Failed to create listing');
         }
 
-        showToast('Produce listing shared successfully');
+        showToast((TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_produce_success) || 'Produce listing shared successfully');
         uploadProduceForm.reset();
         imageUploadPreview.style.display = 'none';
         produceLat.value = '';
         produceLng.value = '';
         produceLocStatus.textContent = '';
-        document.querySelector('.file-upload-wrapper span').textContent = 'Click to upload image';
+        document.querySelector('.file-upload-wrapper span').textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].image_upload_prompt) || 'Click to upload image';
         loadFarmerListings();
     } catch (err) {
         showToast(err.message, 'error');
@@ -548,18 +637,19 @@ function computeMatchScore(item, ngoCoords) {
  */
 function buildMatchReasons(item, ngoCoords) {
     const reasons = [];
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
 
     // Distance reason
     if (item.distance !== null && item.distance !== undefined) {
         if (item.distance < 5) {
-            reasons.push(`Just ${item.distance.toFixed(1)} km away — very close`);
+            reasons.push((dict.reason_distance_close || "Just {dist} km away — very close").replace('{dist}', item.distance.toFixed(1)));
         } else if (item.distance < 20) {
-            reasons.push(`${item.distance.toFixed(1)} km away — can collect today`);
+            reasons.push((dict.reason_distance_near || "{dist} km away — can collect today").replace('{dist}', item.distance.toFixed(1)));
         } else {
-            reasons.push(`${item.distance.toFixed(1)} km away`);
+            reasons.push((dict.reason_distance_far || "{dist} km away").replace('{dist}', item.distance.toFixed(1)));
         }
     } else {
-        reasons.push(`Nearest available listing`);
+        reasons.push(dict.reason_distance_nearest || "Nearest available listing");
     }
 
     // Freshness reason
@@ -569,22 +659,22 @@ function buildMatchReasons(item, ngoCoords) {
     harvest.setHours(0, 0, 0, 0);
     const daysOld = Math.max(0, (today - harvest) / (1000 * 60 * 60 * 24));
     if (daysOld === 0) {
-        reasons.push('Harvested today — maximum freshness');
+        reasons.push(dict.reason_harvest_today || 'Harvested today — maximum freshness');
     } else if (daysOld === 1) {
-        reasons.push('Harvested yesterday — very fresh');
+        reasons.push(dict.reason_harvest_yesterday || 'Harvested yesterday — very fresh');
     } else if (daysOld <= 3) {
-        reasons.push(`Harvested ${daysOld} days ago — still fresh`);
+        reasons.push((dict.reason_harvest_recent || "Harvested {days} days ago — still fresh").replace('{days}', daysOld));
     } else {
-        reasons.push(`Needs urgent pickup — harvested ${daysOld} days ago`);
+        reasons.push((dict.reason_harvest_urgent || "Needs urgent pickup — harvested {days} days ago").replace('{days}', daysOld));
     }
 
     // Quantity reason
     if (item.quantity >= 200) {
-        reasons.push(`Large donation: ${item.quantity} kg — high impact`);
+        reasons.push((dict.reason_quantity_large || "Large donation: {qty} kg — high impact").replace('{qty}', item.quantity));
     } else if (item.quantity >= 50) {
-        reasons.push(`Good quantity: ${item.quantity} kg available`);
+        reasons.push((dict.reason_quantity_good || "Good quantity: {qty} kg available").replace('{qty}', item.quantity));
     } else {
-        reasons.push(`${item.quantity} kg available`);
+        reasons.push((dict.reason_quantity_small || "{qty} kg available").replace('{qty}', item.quantity));
     }
 
     return reasons;
@@ -599,15 +689,16 @@ function getFreshnessUrgency(harvestDateStr) {
     const harvest = new Date(harvestDateStr);
     harvest.setHours(0, 0, 0, 0);
     const daysOld = Math.max(0, (today - harvest) / (1000 * 60 * 60 * 24));
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
 
     if (daysOld >= 6) {
-        return `<span class="urgency-badge urgency-critical">⚠️ Donate within 24 hrs</span>`;
+        return `<span class="urgency-badge urgency-critical">${dict.urgency_critical || '⚠️ Donate within 24 hrs'}</span>`;
     } else if (daysOld >= 4) {
-        return `<span class="urgency-badge urgency-high">⚠️ Donate within 48 hrs</span>`;
+        return `<span class="urgency-badge urgency-high">${dict.urgency_high || '⚠️ Donate within 48 hrs'}</span>`;
     } else if (daysOld >= 2) {
-        return `<span class="urgency-badge urgency-medium">🕐 Donate within 5 days</span>`;
+        return `<span class="urgency-badge urgency-medium">${dict.urgency_medium || '🕐 Donate within 5 days'}</span>`;
     } else {
-        return `<span class="urgency-badge urgency-fresh">✅ Fresh</span>`;
+        return `<span class="urgency-badge urgency-fresh">${dict.urgency_fresh || '✅ Fresh'}</span>`;
     }
 }
 
@@ -615,22 +706,11 @@ async function loadNgoDashboard() {
     // Attempt to get live geolocation first
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-            async (position) => {
+            (position) => {
                 ngoCurrentCoords = {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude
                 };
-                // Persist latest NGO location to backend (for notifications)
-                try {
-                    await fetch(`${API_BASE}/auth/location`, {
-                        method: 'PATCH',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({ latitude: ngoCurrentCoords.lat, longitude: ngoCurrentCoords.lng })
-                    });
-                } catch (e) { console.warn('Could not update location:', e); }
                 loadNgoBrowse();
                 loadNgoRequests();
             },
@@ -665,6 +745,7 @@ async function loadNgoDashboard() {
 
 async function loadFarmerListings() {
     const listEl = document.getElementById('farmer-produce-list');
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
     try {
         const response = await fetch(`${API_BASE}/produce/my`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -675,44 +756,54 @@ async function loadFarmerListings() {
         const all = await response.json();
         const items = all.filter(i => i.status !== 'delivered');
         if (items.length === 0) {
-            listEl.innerHTML = '<div class="no-data" style="grid-column: 1/-1;">No active listings. Delivered items appear in History.</div>';
+            listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1;">${dict.no_active_listings || 'No active listings. Delivered items appear in History.'}</div>`;
             return;
         }
 
-        listEl.innerHTML = items.map(item => `
-            <div class="produce-card">
-                <div class="produce-img-box">
-                    <img class="produce-img" src="${item.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500'}" alt="${item.produce_name}">
-                    <span class="produce-status-badge badge-${item.status}">${item.status.replace('_', ' ')}</span>
-                </div>
-                <div class="produce-info">
-                    <h4 class="produce-title">${item.produce_name}</h4>
-                    ${getFreshnessUrgency(item.harvest_date)}
-                    <div class="produce-meta" style="margin-top: 0.5rem;">
-                        <span class="produce-meta-label">Quantity:</span>
-                        <span>${item.quantity} kg</span>
+        listEl.innerHTML = items.map(item => {
+            const statusKey = 'status_' + item.status;
+            const statusText = dict[statusKey] || item.status.replace('_', ' ');
+            const qtyLabel = dict.meta_quantity || 'Quantity:';
+            const harvestLabel = dict.meta_harvest || 'Harvest:';
+            const locationLabel = dict.meta_location || 'Location:';
+            const deleteBtnText = dict.btn_delete || 'Delete';
+
+            return `
+                <div class="produce-card">
+                    <div class="produce-img-box">
+                        <img class="produce-img" src="${item.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500'}" alt="${item.produce_name}">
+                        <span class="produce-status-badge badge-${item.status}">${statusText}</span>
                     </div>
-                    <div class="produce-meta">
-                        <span class="produce-meta-label">Harvest:</span>
-                        <span>${item.harvest_date}</span>
+                    <div class="produce-info">
+                        <h4 class="produce-title">${item.produce_name}</h4>
+                        ${getFreshnessUrgency(item.harvest_date)}
+                        <div class="produce-meta" style="margin-top: 0.5rem;">
+                            <span class="produce-meta-label">${qtyLabel}</span>
+                            <span>${item.quantity} kg</span>
+                        </div>
+                        <div class="produce-meta">
+                            <span class="produce-meta-label">${harvestLabel}</span>
+                            <span>${item.harvest_date}</span>
+                        </div>
+                        <div class="produce-meta">
+                            <span class="produce-meta-label">${locationLabel}</span>
+                            <span>${item.location}</span>
+                        </div>
                     </div>
-                    <div class="produce-meta">
-                        <span class="produce-meta-label">Location:</span>
-                        <span>${item.location}</span>
+                    <div class="produce-footer">
+                        <button class="btn btn-danger btn-sm" onclick="deleteProduce('${item.id}')">${deleteBtnText}</button>
                     </div>
                 </div>
-                <div class="produce-footer">
-                    <button class="btn btn-danger btn-sm" onclick="deleteProduce('${item.id}')">Delete</button>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (err) {
         listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1; color: var(--danger);">${err.message}</div>`;
     }
 }
 
 async function deleteProduce(id) {
-    if (!confirm('Are you sure you want to delete this listing?')) return;
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
+    if (!confirm(dict.confirm_delete || 'Are you sure you want to delete this listing?')) return;
     try {
         const response = await fetch(`${API_BASE}/produce/${id}`, {
             method: 'DELETE',
@@ -721,7 +812,7 @@ async function deleteProduce(id) {
 
         if (!response.ok) throw new Error('Failed to delete produce');
 
-        showToast('Produce listing deleted');
+        showToast(dict.toast_produce_deleted || 'Produce listing deleted');
         loadFarmerListings();
     } catch (err) {
         showToast(err.message, 'error');
@@ -732,6 +823,7 @@ window.deleteProduce = deleteProduce;
 
 async function loadFarmerRequests() {
     const listEl = document.getElementById('farmer-requests-list');
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
     try {
         const response = await fetch(`${API_BASE}/requests/incoming`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -741,36 +833,48 @@ async function loadFarmerRequests() {
 
         const items = await response.json();
         if (items.length === 0) {
-            listEl.innerHTML = '<div class="no-data" style="grid-column: 1/-1;">No incoming requests yet.</div>';
+            listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1;">${dict.no_incoming_requests || 'No incoming requests yet.'}</div>`;
             return;
         }
 
-        listEl.innerHTML = items.map(item => `
-            <div class="request-card">
-                <div class="request-header">
-                    <h4 class="produce-title">${item.produce_name}</h4>
-                    <span class="produce-status-badge badge-${item.status}">${item.status}</span>
-                </div>
-                <div class="request-detail-grid">
-                    <div><strong>NGO:</strong> ${item.ngo_name || 'Anonymous NGO'}</div>
-                    <div><strong>Quantity:</strong> ${item.quantity} kg</div>
-                    <div><strong>Location:</strong> ${item.location}</div>
-                    <div><strong>Requested:</strong> ${new Date(item.requested_at).toLocaleDateString()}</div>
-                </div>
-                ${item.status === 'pending' ? `
-                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
-                        <button class="btn btn-primary" onclick="updateRequestStatus('${item.id}', 'accept')">Accept</button>
-                        <button class="btn btn-danger" onclick="updateRequestStatus('${item.id}', 'reject')">Reject</button>
+        listEl.innerHTML = items.map(item => {
+            const statusKey = 'status_' + item.status;
+            const statusText = dict[statusKey] || item.status;
+            const ngoLabel = dict.detail_ngo || 'NGO:';
+            const qtyLabel = dict.meta_quantity || 'Quantity:';
+            const locationLabel = dict.meta_location || 'Location:';
+            const requestedLabel = dict.detail_requested || 'Requested:';
+            const acceptBtnText = dict.btn_accept || 'Accept';
+            const rejectBtnText = dict.btn_reject || 'Reject';
+
+            return `
+                <div class="request-card">
+                    <div class="request-header">
+                        <h4 class="produce-title">${item.produce_name}</h4>
+                        <span class="produce-status-badge badge-${item.status}">${statusText}</span>
                     </div>
-                ` : ''}
-            </div>
-        `).join('');
+                    <div class="request-detail-grid">
+                        <div><strong>${ngoLabel}</strong> ${item.ngo_name || 'Anonymous NGO'}</div>
+                        <div><strong>${qtyLabel}</strong> ${item.quantity} kg</div>
+                        <div><strong>${locationLabel}</strong> ${item.location}</div>
+                        <div><strong>${requestedLabel}</strong> ${new Date(item.requested_at).toLocaleDateString()}</div>
+                    </div>
+                    ${item.status === 'pending' ? `
+                        <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
+                            <button class="btn btn-primary" onclick="updateRequestStatus('${item.id}', 'accept')">${acceptBtnText}</button>
+                            <button class="btn btn-danger" onclick="updateRequestStatus('${item.id}', 'reject')">${rejectBtnText}</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
     } catch (err) {
         listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1; color: var(--danger);">${err.message}</div>`;
     }
 }
 
 async function updateRequestStatus(id, action) {
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
     try {
         const response = await fetch(`${API_BASE}/requests/${id}/${action}`, {
             method: 'PUT',
@@ -782,7 +886,9 @@ async function updateRequestStatus(id, action) {
             throw new Error(err.detail || 'Failed to update request');
         }
 
-        showToast(`Request ${action}ed successfully`);
+        const actionText = action === 'accept' ? (dict.btn_accept || 'Accept') : (dict.btn_reject || 'Reject');
+        const successMsg = (dict.toast_request_action || "Request {action}ed successfully").replace('{action}', actionText.toLowerCase());
+        showToast(successMsg);
         loadFarmerRequests();
         loadFarmerListings();
     } catch (err) {
@@ -794,7 +900,8 @@ window.updateRequestStatus = updateRequestStatus;
 
 async function loadNgoBrowse() {
     const listEl = document.getElementById('ngo-produce-list');
-    listEl.innerHTML = '<div class="no-data" style="grid-column: 1/-1;">🤖 Finding best matches for you...</div>';
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
+    listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1;">🤖 ${(dict.loc_locating || 'Finding best matches for you...')}</div>`;
 
     const filterName = document.getElementById('filter-name').value;
     const filterLocation = document.getElementById('filter-location').value;
@@ -823,7 +930,7 @@ async function loadNgoBrowse() {
         if (filterStatus) items = items.filter(i => i.status === filterStatus);
 
         if (items.length === 0) {
-            listEl.innerHTML = '<div class="no-data" style="grid-column: 1/-1;">No produce matches your criteria.</div>';
+            listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1;">${dict.no_produce_criteria || 'No produce matches your criteria.'}</div>`;
             return;
         }
 
@@ -833,94 +940,150 @@ async function loadNgoBrowse() {
         // Render best-match hero card
         let heroHtml = '';
         if (bestMatch && bestMatch.match_score !== undefined) {
-            const reasons = bestMatch.match_reasons || buildMatchReasons(bestMatch, ngoCurrentCoords);
+            const reasons = buildMatchReasons(bestMatch, ngoCurrentCoords);
             const score = bestMatch.match_score;
             const deg = Math.round((score / 100) * 360);
+            
+            const matchTitle = dict.ai_smart_match_title || "✨ AI Smart Match — Best Match For You";
+            const aiRec = dict.ai_recommended || "AI RECOMMENDED";
+            const matchPctLabel = dict.match_percentage || "Match";
+            const harvestText = dict.meta_harvest || "Harvested:";
+            const requestPickupText = dict.btn_request_pickup || "⚡ Request Pickup";
+            const requestedText = dict.btn_requested || "Requested";
+
+            // Localized urgency badge logic for bestMatch
+            let bestMatchUrgencyBadge = '';
+            if (bestMatch.harvest_date) {
+                bestMatchUrgencyBadge = getFreshnessUrgency(bestMatch.harvest_date);
+            }
+
             heroHtml = `
                 <div class="best-match-section">
-                    <div class="best-match-label">🤖 AI Smart Match — Top Pick For You</div>
-                    <div class="best-match-hero">
-                        <div class="match-score-ring" style="--score-deg: ${deg}deg">
-                            <div class="match-score-text">
-                                <span class="match-score-pct">${score}%</span>
-                                <span class="match-score-sub">Match</span>
-                            </div>
+                    <div class="best-match-label">${matchTitle}</div>
+                    <div class="best-match-card">
+                        <div class="best-match-header-row">
+                            <span class="best-match-badge"><span class="badge-sparkle">✨</span> ${aiRec}</span>
+                            ${bestMatchUrgencyBadge}
                         </div>
-                        <div class="best-match-body">
-                            <p class="best-match-produce-name">${bestMatch.produce_name}</p>
-                            <p class="best-match-farmer">by ${bestMatch.farmer_name || 'Anonymous Farmer'} · ${bestMatch.location}</p>
-                            <ul class="match-reasons">
-                                ${reasons.map(r => `<li>${r}</li>`).join('')}
-                            </ul>
-                            <div class="best-match-actions">
-                                <button class="btn-gold" onclick="requestPickup('${bestMatch.id}')">⚡ Request Pickup</button>
-                                <div class="best-match-meta">
-                                    <span>📦 ${bestMatch.quantity} kg</span>
-                                    <span>📅 ${bestMatch.harvest_date}</span>
-                                    ${bestMatch.distance_km !== null && bestMatch.distance_km !== undefined ? `<span>📍 ${bestMatch.distance_km.toFixed(1)} km</span>` : ''}
-                                    <span style="font-weight:600; color:#d97706;">${bestMatch.urgency_label || ''}</span>
+                        <div class="best-match-content">
+                            <div class="best-match-main-info">
+                                <h3 class="best-match-produce-name">${bestMatch.produce_name}</h3>
+                                <div class="best-match-farmer-info">
+                                    <span class="farmer-avatar-circle">${(bestMatch.farmer_name || 'A').charAt(0).toUpperCase()}</span>
+                                    <div class="best-match-farmer-details">
+                                        <span class="best-match-farmer-name">${bestMatch.farmer_name || 'Anonymous Farmer'}</span>
+                                        <span class="best-match-farmer-location">📍 ${bestMatch.location}</span>
+                                    </div>
+                                </div>
+                                <ul class="match-reasons-list">
+                                    ${reasons.map(r => `
+                                        <li>
+                                            <span class="reason-icon">✨</span>
+                                            <span class="reason-text">${r}</span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                            <div class="best-match-score-section">
+                                <div class="best-match-score-ring" style="--score-deg: ${deg}deg">
+                                    <div class="best-match-score-inner">
+                                        <span class="best-match-score-pct">${score}%</span>
+                                        <span class="best-match-score-text">${matchPctLabel}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                        <div class="best-match-footer">
+                            <div class="best-match-stats">
+                                <span class="best-match-stat-chip">📦 <strong>${bestMatch.quantity} kg</strong></span>
+                                <span class="best-match-stat-chip">${harvestText} <strong>${bestMatch.harvest_date}</strong></span>
+                                ${bestMatch.distance_km !== null && bestMatch.distance_km !== undefined ? `
+                                    <span class="best-match-stat-chip distance">📍 <strong>${(dict.reason_distance_far || "{dist} km away").replace('{dist}', bestMatch.distance_km.toFixed(1))}</strong></span>
+                                ` : ''}
+                            </div>
+                            <button class="best-match-pickup-btn" onclick="requestPickup('${bestMatch.id}')">${requestPickupText}</button>
+                        </div>
                     </div>
                 </div>
-                <div class="browse-section-label">All Available Produce</div>
+                <div class="browse-section-label">${dict.all_available_produce || "All Available Produce"}</div>
             `;
         }
 
-        listEl.innerHTML = heroHtml + items.map(item => `
-            <div class="produce-card">
-                <div class="produce-img-box">
-                    <img class="produce-img" src="${item.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500'}" alt="${item.produce_name}">
-                    <span class="produce-status-badge badge-${item.status}">${item.status.replace('_', ' ')}</span>
+        listEl.innerHTML = heroHtml + `<div class="product-showcase-grid">` + items.map((item, index) => {
+            const matchScoreBadge = item.match_score !== undefined ? `
+            <div class="product-score-badge">
+                <span class="score-sparkle">✨</span> ${item.match_score}% ${dict.match_percentage || 'Match'}
+            </div>` : '';
+
+            const statusKey = 'status_' + item.status;
+            const statusText = dict[statusKey] || item.status.replace('_', ' ');
+
+            const qtyLabelText = (dict.meta_quantity || 'Quantity:').replace(':', '');
+            const harvestLabelText = (dict.meta_harvest || 'Harvested:').replace(':', '');
+            const farmerNameVal = item.farmer_name || 'Anonymous Farmer';
+
+            let actionButton = '';
+            if (item.status === 'available') {
+                actionButton = `<button class="product-action-btn" onclick="requestPickup('${item.id}')">${dict.btn_request_pickup || '⚡ Request Pickup'}</button>`;
+            } else {
+                actionButton = `<button class="product-action-btn disabled" disabled>${statusText}</button>`;
+            }
+
+            return `
+                <div class="product-card ${item.status}" style="--i:${index}">
+                    <div class="product-image-box">
+                        <img src="${item.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600'}" alt="${item.produce_name}" class="product-img" loading="lazy">
+                        
+                        ${matchScoreBadge}
+                        
+                        <span class="product-status-badge status-${item.status}">
+                            ${statusText}
+                        </span>
+                    </div>
+
+                    <div class="product-body">
+                        <div class="product-header-row">
+                            ${getFreshnessUrgency(item.harvest_date)}
+                            ${item.distance_km !== null && item.distance_km !== undefined ? `
+                                <span class="product-distance-badge">📍 ${item.distance_km.toFixed(1)} km</span>
+                            ` : ''}
+                        </div>
+                        
+                        <h4 class="product-title" title="${item.produce_name}">${item.produce_name}</h4>
+                        
+                        <div class="product-farmer-info">
+                            <span class="farmer-avatar">${(farmerNameVal).charAt(0).toUpperCase()}</span>
+                            <div class="farmer-meta">
+                                <span class="farmer-name">${farmerNameVal}</span>
+                                <span class="farmer-location" title="${item.location}">${item.location}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="product-specs">
+                            <div class="spec-item">
+                                <span class="spec-label">${qtyLabelText}</span>
+                                <span class="spec-val">${item.quantity} kg</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">${harvestLabelText}</span>
+                                <span class="spec-val">${item.harvest_date}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="product-footer">
+                        ${actionButton}
+                    </div>
                 </div>
-                <div class="produce-info">
-                    <h4 class="produce-title">${item.produce_name}</h4>
-                    <span class="urgency-badge urgency-${item.urgency_level || 'fresh'}">${item.urgency_label || '✅ Fresh'}</span>
-                    <div class="produce-meta" style="margin-top: 0.5rem;">
-                        <span class="produce-meta-label">Quantity:</span>
-                        <span>${item.quantity} kg</span>
-                    </div>
-                    <div class="produce-meta">
-                        <span class="produce-meta-label">Harvest:</span>
-                        <span>${item.harvest_date}</span>
-                    </div>
-                    <div class="produce-meta">
-                        <span class="produce-meta-label">Farmer:</span>
-                        <span>${item.farmer_name || 'Anonymous Farmer'}</span>
-                    </div>
-                    <div class="produce-meta">
-                        <span class="produce-meta-label">Location:</span>
-                        <span>${item.location}</span>
-                    </div>
-                    ${item.distance_km !== null && item.distance_km !== undefined ? `
-                    <div class="produce-meta" style="color: #10b981; font-weight: 600; margin-top: 0.25rem;">
-                        <span class="produce-meta-label">📍 Distance:</span>
-                        <span>${item.distance_km.toFixed(1)} km away</span>
-                    </div>
-                    ` : ''}
-                    ${item.match_score !== undefined ? `
-                    <div class="produce-meta" style="color: #b45309; font-weight: 600;">
-                        <span class="produce-meta-label">🤖 Match:</span>
-                        <span>${item.match_score}%</span>
-                    </div>
-                    ` : ''}
-                </div>
-                <div class="produce-footer">
-                    ${item.status === 'available' ? `
-                        <button class="btn btn-primary" onclick="requestPickup('${item.id}')">Request Pickup</button>
-                    ` : `
-                        <button class="btn btn-secondary" disabled>${item.status.replace('_', ' ')}</button>
-                    `}
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('') + `</div>`;
     } catch (err) {
         listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1; color: var(--danger);">${err.message}</div>`;
     }
 }
 
 async function requestPickup(produceId) {
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
     try {
         const response = await fetch(`${API_BASE}/requests/${produceId}`, {
             method: 'POST',
@@ -932,7 +1095,7 @@ async function requestPickup(produceId) {
             throw new Error(err.detail || 'Failed to request pickup');
         }
 
-        showToast('Pickup request sent successfully');
+        showToast(dict.toast_request_success || 'Pickup request sent successfully');
         loadNgoBrowse();
         loadNgoRequests();
     } catch (err) {
@@ -944,6 +1107,7 @@ window.requestPickup = requestPickup;
 
 async function loadNgoRequests() {
     const listEl = document.getElementById('ngo-requests-list');
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
     try {
         const response = await fetch(`${API_BASE}/requests/my`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -954,35 +1118,46 @@ async function loadNgoRequests() {
         const all = await response.json();
         const items = all.filter(i => i.status !== 'delivered');
         if (items.length === 0) {
-            listEl.innerHTML = '<div class="no-data" style="grid-column: 1/-1;">No active requests. Delivered items appear in History.</div>';
+            listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1;">${dict.no_active_requests || 'No active requests. Delivered items appear in History.'}</div>`;
             return;
         }
 
-        listEl.innerHTML = items.map(item => `
-            <div class="request-card">
-                <div class="request-header">
-                    <h4 class="produce-title">${item.produce_name}</h4>
-                    <span class="produce-status-badge badge-${item.status}">${item.status}</span>
-                </div>
-                <div class="request-detail-grid">
-                    <div><strong>Farmer:</strong> ${item.farmer_name || 'Anonymous Farmer'}</div>
-                    <div><strong>Quantity:</strong> ${item.quantity} kg</div>
-                    <div><strong>Location:</strong> ${item.location}</div>
-                    <div><strong>Requested:</strong> ${new Date(item.requested_at).toLocaleDateString()}</div>
-                </div>
-                ${item.status === 'accepted' ? `
-                    <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
-                        <button class="btn btn-primary" onclick="markAsDelivered('${item.id}')">Mark Delivered</button>
+        listEl.innerHTML = items.map(item => {
+            const statusKey = 'status_' + item.status;
+            const statusText = dict[statusKey] || item.status;
+            const farmerLabel = dict.detail_farmer || 'Farmer:';
+            const qtyLabel = dict.meta_quantity || 'Quantity:';
+            const locationLabel = dict.meta_location || 'Location:';
+            const requestedLabel = dict.detail_requested || 'Requested:';
+            const markDeliveredText = dict.btn_mark_delivered || 'Mark Delivered';
+
+            return `
+                <div class="request-card">
+                    <div class="request-header">
+                        <h4 class="produce-title">${item.produce_name}</h4>
+                        <span class="produce-status-badge badge-${item.status}">${statusText}</span>
                     </div>
-                ` : ''}
-            </div>
-        `).join('');
+                    <div class="request-detail-grid">
+                        <div><strong>${farmerLabel}</strong> ${item.farmer_name || 'Anonymous Farmer'}</div>
+                        <div><strong>${qtyLabel}</strong> ${item.quantity} kg</div>
+                        <div><strong>${locationLabel}</strong> ${item.location}</div>
+                        <div><strong>${requestedLabel}</strong> ${new Date(item.requested_at).toLocaleDateString()}</div>
+                    </div>
+                    ${item.status === 'accepted' ? `
+                        <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+                            <button class="btn btn-primary" onclick="markAsDelivered('${item.id}')">${markDeliveredText}</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
     } catch (err) {
         listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1; color: var(--danger);">${err.message}</div>`;
     }
 }
 
 async function markAsDelivered(requestId) {
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
     try {
         const response = await fetch(`${API_BASE}/requests/${requestId}/delivered`, {
             method: 'PUT',
@@ -994,7 +1169,7 @@ async function markAsDelivered(requestId) {
             throw new Error(err.detail || 'Failed to update delivery status');
         }
 
-        showToast('Pickup completed and marked as delivered');
+        showToast(dict.toast_delivery_success || 'Pickup completed and marked as delivered');
         loadNgoRequests();
         loadNgoBrowse();
     } catch (err) {
@@ -1006,6 +1181,7 @@ window.markAsDelivered = markAsDelivered;
 
 async function loadFarmerHistory() {
     const listEl = document.getElementById('farmer-history-list');
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
     try {
         const response = await fetch(`${API_BASE}/produce/my`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -1016,33 +1192,40 @@ async function loadFarmerHistory() {
         const all = await response.json();
         const items = all.filter(i => i.status === 'delivered');
         if (items.length === 0) {
-            listEl.innerHTML = '<div class="no-data" style="grid-column: 1/-1;">No delivered produce yet. Completed donations will appear here.</div>';
+            listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1;">${dict.no_delivered_produce || 'No delivered produce yet. Completed donations will appear here.'}</div>`;
             return;
         }
 
-        listEl.innerHTML = items.map(item => `
-            <div class="produce-card" style="opacity: 0.85;">
-                <div class="produce-img-box">
-                    <img class="produce-img" src="${item.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500'}" alt="${item.produce_name}">
-                    <span class="produce-status-badge badge-delivered">✓ Delivered</span>
+        listEl.innerHTML = items.map(item => {
+            const qtyLabel = dict.meta_quantity || 'Quantity:';
+            const harvestLabel = dict.meta_harvest || 'Harvest:';
+            const locationLabel = dict.meta_location || 'Location:';
+            const deliveredBadge = dict.status_delivered || 'Delivered';
+
+            return `
+                <div class="produce-card" style="opacity: 0.85;">
+                    <div class="produce-img-box">
+                        <img class="produce-img" src="${item.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500'}" alt="${item.produce_name}">
+                        <span class="produce-status-badge badge-delivered">✓ ${deliveredBadge}</span>
+                    </div>
+                    <div class="produce-info">
+                        <h4 class="produce-title">${item.produce_name}</h4>
+                        <div class="produce-meta">
+                            <span class="produce-meta-label">${qtyLabel}</span>
+                            <span>${item.quantity} kg ${dict.status_delivered ? dict.status_delivered.toLowerCase() : 'donated'}</span>
+                        </div>
+                        <div class="produce-meta">
+                            <span class="produce-meta-label">${harvestLabel}</span>
+                            <span>${item.harvest_date}</span>
+                        </div>
+                        <div class="produce-meta">
+                            <span class="produce-meta-label">${locationLabel}</span>
+                            <span>${item.location}</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="produce-info">
-                    <h4 class="produce-title">${item.produce_name}</h4>
-                    <div class="produce-meta">
-                        <span class="produce-meta-label">Quantity:</span>
-                        <span>${item.quantity} kg donated</span>
-                    </div>
-                    <div class="produce-meta">
-                        <span class="produce-meta-label">Harvest:</span>
-                        <span>${item.harvest_date}</span>
-                    </div>
-                    <div class="produce-meta">
-                        <span class="produce-meta-label">Location:</span>
-                        <span>${item.location}</span>
-                    </div>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (err) {
         listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1; color: var(--danger);">${err.message}</div>`;
     }
@@ -1050,6 +1233,7 @@ async function loadFarmerHistory() {
 
 async function loadNgoHistory() {
     const listEl = document.getElementById('ngo-history-list');
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
     try {
         const response = await fetch(`${API_BASE}/requests/my`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -1060,24 +1244,32 @@ async function loadNgoHistory() {
         const all = await response.json();
         const items = all.filter(i => i.status === 'delivered');
         if (items.length === 0) {
-            listEl.innerHTML = '<div class="no-data" style="grid-column: 1/-1;">No deliveries completed yet. They will appear here once marked as delivered.</div>';
+            listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1;">${dict.no_deliveries_completed || 'No deliveries completed yet. They will appear here once marked as delivered.'}</div>`;
             return;
         }
 
-        listEl.innerHTML = items.map(item => `
-            <div class="request-card" style="opacity: 0.85;">
-                <div class="request-header">
-                    <h4 class="produce-title">${item.produce_name}</h4>
-                    <span class="produce-status-badge badge-delivered">✓ Delivered</span>
+        listEl.innerHTML = items.map(item => {
+            const farmerLabel = dict.detail_farmer || 'Farmer:';
+            const qtyLabel = dict.meta_quantity || 'Quantity:';
+            const locationLabel = dict.meta_location || 'Location:';
+            const deliveredLabel = dict.detail_delivered || 'Delivered:';
+            const deliveredBadgeText = dict.status_delivered || 'Delivered';
+
+            return `
+                <div class="request-card" style="opacity: 0.85;">
+                    <div class="request-header">
+                        <h4 class="produce-title">${item.produce_name}</h4>
+                        <span class="produce-status-badge badge-delivered">✓ ${deliveredBadgeText}</span>
+                    </div>
+                    <div class="request-detail-grid">
+                        <div><strong>${farmerLabel}</strong> ${item.farmer_name || 'Anonymous Farmer'}</div>
+                        <div><strong>${qtyLabel}</strong> ${item.quantity} kg</div>
+                        <div><strong>${locationLabel}</strong> ${item.location}</div>
+                        <div><strong>${deliveredLabel}</strong> ${new Date(item.updated_at).toLocaleDateString()}</div>
+                    </div>
                 </div>
-                <div class="request-detail-grid">
-                    <div><strong>Farmer:</strong> ${item.farmer_name || 'Anonymous Farmer'}</div>
-                    <div><strong>Quantity:</strong> ${item.quantity} kg</div>
-                    <div><strong>Location:</strong> ${item.location}</div>
-                    <div><strong>Delivered:</strong> ${new Date(item.updated_at).toLocaleDateString()}</div>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (err) {
         listEl.innerHTML = `<div class="no-data" style="grid-column: 1/-1; color: var(--danger);">${err.message}</div>`;
     }
@@ -1089,14 +1281,15 @@ async function detectLocation(latInputId, lngInputId, displayInputId, statusId) 
     const lngInput = document.getElementById(lngInputId);
     const displayInput = document.getElementById(displayInputId);
     const statusEl = document.getElementById(statusId);
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
 
     if (!navigator.geolocation) {
-        statusEl.textContent = "Geolocation is not supported by your browser.";
+        statusEl.textContent = dict.loc_not_supported || "Geolocation is not supported by your browser.";
         statusEl.style.color = "var(--danger)";
         return;
     }
 
-    statusEl.textContent = "Locating...";
+    statusEl.textContent = dict.loc_locating || "Locating...";
     statusEl.style.color = "#16a34a";
 
     navigator.geolocation.getCurrentPosition(
@@ -1106,32 +1299,32 @@ async function detectLocation(latInputId, lngInputId, displayInputId, statusId) 
             latInput.value = lat;
             lngInput.value = lng;
 
-            statusEl.textContent = "Fetching address...";
+            statusEl.textContent = dict.loc_fetching || "Fetching address...";
             try {
                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
                 if (!response.ok) throw new Error("Failed reverse geocoding");
                 const data = await response.json();
                 const address = data.display_name || `${lat}, ${lng}`;
                 displayInput.value = address;
-                statusEl.textContent = "Location detected successfully.";
+                statusEl.textContent = dict.loc_success || "Location detected successfully.";
                 statusEl.style.color = "#16a34a";
             } catch (err) {
                 console.error(err);
                 displayInput.value = `${lat}, ${lng}`;
-                statusEl.textContent = "Location detected (could not fetch address).";
+                statusEl.textContent = dict.loc_fail || "Location detected (could not fetch address).";
                 statusEl.style.color = "#d97706";
             }
         },
         (error) => {
             console.error(error);
-            let msg = "Unable to retrieve your location.";
+            let msg = dict.loc_fail || "Unable to retrieve your location.";
             if (error.code === error.PERMISSION_DENIED) {
-                msg = "Location permission denied. Please enter address manually.";
+                msg = dict.loc_denied || "Location permission denied. Please enter address manually.";
             }
             statusEl.textContent = msg;
             statusEl.style.color = "var(--danger)";
             displayInput.readOnly = false;
-            displayInput.placeholder = "Enter address manually...";
+            displayInput.placeholder = dict.loc_placeholder_manual || "Enter address manually...";
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -1151,6 +1344,7 @@ let ngoMapInstance = null;
 
 async function loadMap(role) {
     const mapId = role === 'Farmer' ? 'farmer-map' : 'ngo-map';
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
     
     try {
         const response = await fetch(`${API_BASE}/map/data`, {
@@ -1202,14 +1396,20 @@ async function loadMap(role) {
 
         data.farmers.forEach(farmer => {
             if (farmer.lat && farmer.lng) {
+                const statusKey = 'status_' + farmer.status;
+                const statusText = dict[statusKey] || farmer.status.replace('_', ' ');
+                const qtyLabelText = (dict.meta_quantity || 'Quantity:').replace(':', '');
+                const produceLabelText = (dict.filter_label_name || 'Produce:').replace(':', '');
+                const statusLabelText = (dict.filter_label_status || 'Status:').replace(':', '');
+
                 const marker = L.marker([farmer.lat, farmer.lng], { icon: greenIcon })
                     .addTo(map)
                     .bindPopup(`
                         <div style="font-family: sans-serif; line-height: 1.4;">
                             <h4 style="margin: 0 0 4px 0; color: #16a34a; font-weight: bold;">🌾 ${farmer.name}</h4>
-                            <p style="margin: 0 0 2px 0;"><strong>Produce:</strong> ${farmer.produce_name}</p>
-                            <p style="margin: 0 0 2px 0;"><strong>Quantity:</strong> ${farmer.quantity} kg</p>
-                            <p style="margin: 0 0 2px 0;"><strong>Status:</strong> <span class="badge-${farmer.status}" style="font-size: 11px; padding: 2px 6px; border-radius: 4px;">${farmer.status.replace('_', ' ')}</span></p>
+                            <p style="margin: 0 0 2px 0;"><strong>${produceLabelText}:</strong> ${farmer.produce_name}</p>
+                            <p style="margin: 0 0 2px 0;"><strong>${qtyLabelText}:</strong> ${farmer.quantity} kg</p>
+                            <p style="margin: 0 0 2px 0;"><strong>${statusLabelText}:</strong> <span class="badge-${farmer.status}" style="font-size: 11px; padding: 2px 6px; border-radius: 4px;">${statusText}</span></p>
                             <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;">📍 ${farmer.location}</p>
                         </div>
                     `);
@@ -1219,13 +1419,16 @@ async function loadMap(role) {
 
         data.ngos.forEach(ngo => {
             if (ngo.lat && ngo.lng) {
+                const ngoType = dict.role_ngo || 'NGO / Food Bank';
+                const statusText = dict.status_available || 'Active'; // standard active status
+
                 const marker = L.marker([ngo.lat, ngo.lng], { icon: blueIcon })
                     .addTo(map)
                     .bindPopup(`
                         <div style="font-family: sans-serif; line-height: 1.4;">
                             <h4 style="margin: 0 0 4px 0; color: #2563eb; font-weight: bold;">🏢 ${ngo.name}</h4>
-                            <p style="margin: 0 0 2px 0;"><strong>Type:</strong> NGO / Food Bank</p>
-                            <p style="margin: 0 0 2px 0;"><strong>Status:</strong> Active</p>
+                            <p style="margin: 0 0 2px 0;"><strong>Type:</strong> ${ngoType}</p>
+                            <p style="margin: 0 0 2px 0;"><strong>Status:</strong> ${statusText}</p>
                             <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;">📍 Registered Partner</p>
                         </div>
                     `);
@@ -1251,7 +1454,8 @@ async function loadMap(role) {
 // Analytics Logic
 async function loadFarmerStats() {
     const container = document.getElementById('farmer-stats-container');
-    container.innerHTML = `<div class="stat-skeleton h-48 w-full rounded-2xl"></div>`;
+    container.innerHTML = `<div class="stat-skeleton" style="height:180px;width:100%;"></div>`;
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
     try {
         const response = await fetch(`${API_BASE}/stats/farmer`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -1259,52 +1463,62 @@ async function loadFarmerStats() {
         if (!response.ok) throw new Error('Failed to load stats');
         const data = await response.json();
         container.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                    <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl text-2xl">🌾</div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Uploaded</p>
-                        <h3 class="text-2xl font-bold text-slate-800">${data.total_uploaded}</h3>
+            <div class="stats-section-header">
+                <h3 class="stats-section-title">📊 ${dict.analytics_farmer_title || 'Your Impact Dashboard'}</h3>
+                <p class="stats-section-sub">${dict.analytics_farmer_sub || 'Summary of your farming & donation activity'}</p>
+            </div>
+            <div class="stat-grid">
+                <div class="stat-card stat-card-green">
+                    <div class="stat-icon">🌾</div>
+                    <div class="stat-info">
+                        <p class="stat-label">${dict.stat_total_uploaded || 'Total Uploaded'}</p>
+                        <h3 class="stat-value">${data.total_uploaded}</h3>
                     </div>
+                    <div class="stat-decoration"></div>
                 </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                    <div class="p-3 bg-blue-50 text-blue-600 rounded-xl text-2xl">📋</div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Active Listings</p>
-                        <h3 class="text-2xl font-bold text-slate-800">${data.active_listings}</h3>
+                <div class="stat-card stat-card-blue">
+                    <div class="stat-icon">📋</div>
+                    <div class="stat-info">
+                        <p class="stat-label">${dict.stat_active_listings || 'Active Listings'}</p>
+                        <h3 class="stat-value">${data.active_listings}</h3>
                     </div>
+                    <div class="stat-decoration"></div>
                 </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                    <div class="p-3 bg-amber-50 text-amber-600 rounded-xl text-2xl">⏳</div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Pending Requests</p>
-                        <h3 class="text-2xl font-bold text-slate-800">${data.pending_requests}</h3>
+                <div class="stat-card stat-card-amber">
+                    <div class="stat-icon">⏳</div>
+                    <div class="stat-info">
+                        <p class="stat-label">${dict.stat_pending_requests || 'Pending Requests'}</p>
+                        <h3 class="stat-value">${data.pending_requests}</h3>
                     </div>
+                    <div class="stat-decoration"></div>
                 </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                    <div class="p-3 bg-purple-50 text-purple-600 rounded-xl text-2xl">📦</div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Completed Donations</p>
-                        <h3 class="text-2xl font-bold text-slate-800">${data.completed_donations}</h3>
+                <div class="stat-card stat-card-purple">
+                    <div class="stat-icon">📦</div>
+                    <div class="stat-info">
+                        <p class="stat-label">${dict.stat_completed_donations || 'Completed Donations'}</p>
+                        <h3 class="stat-value">${data.completed_donations}</h3>
                     </div>
+                    <div class="stat-decoration"></div>
                 </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 md:col-span-2">
-                    <div class="p-3 bg-teal-50 text-teal-600 rounded-xl text-2xl">⚖️</div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Produce Donated</p>
-                        <h3 class="text-2xl font-bold text-slate-800">${data.total_kg_donated} kg</h3>
+                <div class="stat-card stat-card-teal stat-card-wide">
+                    <div class="stat-icon">⚖️</div>
+                    <div class="stat-info">
+                        <p class="stat-label">${dict.stat_total_donated || 'Total Produce Donated'}</p>
+                        <h3 class="stat-value">${data.total_kg_donated} <span class="stat-unit">kg</span></h3>
                     </div>
+                    <div class="stat-decoration"></div>
                 </div>
             </div>
         `;
     } catch (err) {
-        container.innerHTML = `<div class="text-red-500 font-medium">${err.message}</div>`;
+        container.innerHTML = `<div class="stats-error">⚠️ ${err.message}</div>`;
     }
 }
 
 async function loadNgoStats() {
     const container = document.getElementById('ngo-stats-container');
-    container.innerHTML = `<div class="stat-skeleton h-48 w-full rounded-2xl"></div>`;
+    container.innerHTML = `<div class="stat-skeleton" style="height:180px;width:100%;"></div>`;
+    const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
     try {
         const response = await fetch(`${API_BASE}/stats/ngo`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -1312,39 +1526,47 @@ async function loadNgoStats() {
         if (!response.ok) throw new Error('Failed to load stats');
         const data = await response.json();
         container.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                    <div class="p-3 bg-blue-50 text-blue-600 rounded-xl text-2xl">📤</div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Requests Sent</p>
-                        <h3 class="text-2xl font-bold text-slate-800">${data.total_requests}</h3>
+            <div class="stats-section-header">
+                <h3 class="stats-section-title">📊 ${dict.analytics_ngo_title || 'Your NGO Impact Overview'}</h3>
+                <p class="stats-section-sub">${dict.analytics_ngo_sub || 'Track your food rescue and distribution activity'}</p>
+            </div>
+            <div class="stat-grid">
+                <div class="stat-card stat-card-blue">
+                    <div class="stat-icon">📤</div>
+                    <div class="stat-info">
+                        <p class="stat-label">${dict.stat_total_sent || 'Total Requests Sent'}</p>
+                        <h3 class="stat-value">${data.total_requests}</h3>
                     </div>
+                    <div class="stat-decoration"></div>
                 </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                    <div class="p-3 bg-amber-50 text-amber-600 rounded-xl text-2xl">🤝</div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Accepted (Scheduled)</p>
-                        <h3 class="text-2xl font-bold text-slate-800">${data.accepted_requests}</h3>
+                <div class="stat-card stat-card-amber">
+                    <div class="stat-icon">🤝</div>
+                    <div class="stat-info">
+                        <p class="stat-label">${dict.stat_accepted_scheduled || 'Accepted & Scheduled'}</p>
+                        <h3 class="stat-value">${data.accepted_requests}</h3>
                     </div>
+                    <div class="stat-decoration"></div>
                 </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                    <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl text-2xl">✓</div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Completed Deliveries</p>
-                        <h3 class="text-2xl font-bold text-slate-800">${data.completed_deliveries}</h3>
+                <div class="stat-card stat-card-green">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-info">
+                        <p class="stat-label">${dict.stat_completed_deliveries || 'Completed Deliveries'}</p>
+                        <h3 class="stat-value">${data.completed_deliveries}</h3>
                     </div>
+                    <div class="stat-decoration"></div>
                 </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                    <div class="p-3 bg-teal-50 text-teal-600 rounded-xl text-2xl">⚖️</div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Quantity Received</p>
-                        <h3 class="text-2xl font-bold text-slate-800">${data.total_kg_received} kg</h3>
+                <div class="stat-card stat-card-teal">
+                    <div class="stat-icon">⚖️</div>
+                    <div class="stat-info">
+                        <p class="stat-label">${dict.stat_total_received || 'Total Quantity Received'}</p>
+                        <h3 class="stat-value">${data.total_kg_received} <span class="stat-unit">kg</span></h3>
                     </div>
+                    <div class="stat-decoration"></div>
                 </div>
             </div>
         `;
     } catch (err) {
-        container.innerHTML = `<div class="text-red-500 font-medium">${err.message}</div>`;
+        container.innerHTML = `<div class="stats-error">⚠️ ${err.message}</div>`;
     }
 }
 
@@ -1381,5 +1603,15 @@ async function initApp() {
         }
     }
 }
+
+// Bind language selector and initialize
+const langSelector = document.getElementById('lang-selector');
+if (langSelector) {
+    langSelector.value = currentLang;
+    langSelector.addEventListener('change', (e) => {
+        setLanguage(e.target.value);
+    });
+}
+setLanguage(currentLang);
 
 initApp();
