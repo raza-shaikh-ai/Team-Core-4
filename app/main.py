@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, produce, requests, upload, stats, map_data
+from app.routers import auth, produce, requests, upload, stats, map_data, smart_match
 
 app = FastAPI()
 
@@ -19,6 +19,7 @@ app.include_router(requests.router)
 app.include_router(upload.router)
 app.include_router(stats.router)
 app.include_router(map_data.router)
+app.include_router(smart_match.router)
 
 
 @app.get("/", tags=["Health"])

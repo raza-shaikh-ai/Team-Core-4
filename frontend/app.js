@@ -1,4 +1,6 @@
 const API_BASE = 'http://localhost:8000';
+//const API_BASE = 'http://13.234.42.87:8000';
+
 
 let token = localStorage.getItem('token') || null;
 let currentUser = null;
@@ -495,6 +497,120 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
     return R * c; // Distance in km
 }
 
+// =============================================
+// AI SMART MATCHING — Scoring Engine
+// =============================================
+
+/**
+ * Computes a 0–100 match score for a produce item relative to the NGO's location.
+ * Weights: Distance 40%, Freshness 35%, Quantity 15%, Availability 10%
+ */
+function computeMatchScore(item, ngoCoords) {
+    let score = 0;
+
+    // --- Distance Score (40%) ---
+    if (item.distance !== null && item.distance !== undefined) {
+        const MAX_KM = 50;
+        const distScore = Math.max(0, 1 - item.distance / MAX_KM);
+        score += distScore * 40;
+    } else if (!ngoCoords) {
+        // No location data at all — give partial credit so items still rank
+        score += 20;
+    }
+
+    // --- Freshness Score (35%) ---
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const harvest = new Date(item.harvest_date);
+    harvest.setHours(0, 0, 0, 0);
+    const daysOld = Math.max(0, (today - harvest) / (1000 * 60 * 60 * 24));
+    const MAX_DAYS = 7;
+    const freshnessScore = Math.max(0, 1 - daysOld / MAX_DAYS);
+    score += freshnessScore * 35;
+
+    // --- Quantity Score (15%) ---
+    const MAX_KG = 500;
+    const qtyScore = Math.min(1, item.quantity / MAX_KG);
+    score += qtyScore * 15;
+
+    // --- Availability Score (10%) ---
+    if (item.status === 'available') {
+        score += 10;
+    } else if (item.status === 'requested') {
+        score += 5;
+    }
+
+    return Math.round(score);
+}
+
+/**
+ * Generates human-readable match reason bullets for the hero card.
+ */
+function buildMatchReasons(item, ngoCoords) {
+    const reasons = [];
+
+    // Distance reason
+    if (item.distance !== null && item.distance !== undefined) {
+        if (item.distance < 5) {
+            reasons.push(`Just ${item.distance.toFixed(1)} km away — very close`);
+        } else if (item.distance < 20) {
+            reasons.push(`${item.distance.toFixed(1)} km away — can collect today`);
+        } else {
+            reasons.push(`${item.distance.toFixed(1)} km away`);
+        }
+    } else {
+        reasons.push(`Nearest available listing`);
+    }
+
+    // Freshness reason
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const harvest = new Date(item.harvest_date);
+    harvest.setHours(0, 0, 0, 0);
+    const daysOld = Math.max(0, (today - harvest) / (1000 * 60 * 60 * 24));
+    if (daysOld === 0) {
+        reasons.push('Harvested today — maximum freshness');
+    } else if (daysOld === 1) {
+        reasons.push('Harvested yesterday — very fresh');
+    } else if (daysOld <= 3) {
+        reasons.push(`Harvested ${daysOld} days ago — still fresh`);
+    } else {
+        reasons.push(`Needs urgent pickup — harvested ${daysOld} days ago`);
+    }
+
+    // Quantity reason
+    if (item.quantity >= 200) {
+        reasons.push(`Large donation: ${item.quantity} kg — high impact`);
+    } else if (item.quantity >= 50) {
+        reasons.push(`Good quantity: ${item.quantity} kg available`);
+    } else {
+        reasons.push(`${item.quantity} kg available`);
+    }
+
+    return reasons;
+}
+
+/**
+ * Returns an urgency badge HTML string based on harvest date.
+ */
+function getFreshnessUrgency(harvestDateStr) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const harvest = new Date(harvestDateStr);
+    harvest.setHours(0, 0, 0, 0);
+    const daysOld = Math.max(0, (today - harvest) / (1000 * 60 * 60 * 24));
+
+    if (daysOld >= 6) {
+        return `<span class="urgency-badge urgency-critical">⚠️ Donate within 24 hrs</span>`;
+    } else if (daysOld >= 4) {
+        return `<span class="urgency-badge urgency-high">⚠️ Donate within 48 hrs</span>`;
+    } else if (daysOld >= 2) {
+        return `<span class="urgency-badge urgency-medium">🕐 Donate within 5 days</span>`;
+    } else {
+        return `<span class="urgency-badge urgency-fresh">✅ Fresh</span>`;
+    }
+}
+
 async function loadNgoDashboard() {
     // Attempt to get live geolocation first
     if (navigator.geolocation) {
@@ -560,7 +676,8 @@ async function loadFarmerListings() {
                 </div>
                 <div class="produce-info">
                     <h4 class="produce-title">${item.produce_name}</h4>
-                    <div class="produce-meta">
+                    ${getFreshnessUrgency(item.harvest_date)}
+                    <div class="produce-meta" style="margin-top: 0.5rem;">
                         <span class="produce-meta-label">Quantity:</span>
                         <span>${item.quantity} kg</span>
                     </div>
@@ -666,69 +783,81 @@ window.updateRequestStatus = updateRequestStatus;
 
 async function loadNgoBrowse() {
     const listEl = document.getElementById('ngo-produce-list');
-    
+    listEl.innerHTML = '<div class="no-data" style="grid-column: 1/-1;">🤖 Finding best matches for you...</div>';
+
     const filterName = document.getElementById('filter-name').value;
     const filterLocation = document.getElementById('filter-location').value;
     const filterStatus = document.getElementById('filter-status').value;
 
-    const params = new URLSearchParams();
-    if (filterName) params.append('produce_name', filterName);
-    if (filterLocation) params.append('location', filterLocation);
-    if (filterStatus) params.append('status', filterStatus);
-
     try {
-        const response = await fetch(`${API_BASE}/produce?${params.toString()}`, {
+        // Build smart-match URL with NGO location for server-side scoring
+        const matchParams = new URLSearchParams({ limit: 100 });
+        if (ngoCurrentCoords) {
+            matchParams.append('lat', ngoCurrentCoords.lat);
+            matchParams.append('lng', ngoCurrentCoords.lng);
+        }
+
+        const response = await fetch(`${API_BASE}/match/smart?${matchParams.toString()}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (!response.ok) throw new Error('Failed to search produce');
+        if (!response.ok) throw new Error('Failed to fetch smart matches');
 
-        const all = await response.json();
-        let items = all.filter(i => i.status !== 'delivered');
+        const data = await response.json();
+        let items = data.items;
+
+        // Apply client-side filters on top of server results
+        if (filterName) items = items.filter(i => i.produce_name.toLowerCase().includes(filterName.toLowerCase()));
+        if (filterLocation) items = items.filter(i => i.location.toLowerCase().includes(filterLocation.toLowerCase()));
+        if (filterStatus) items = items.filter(i => i.status === filterStatus);
+
         if (items.length === 0) {
             listEl.innerHTML = '<div class="no-data" style="grid-column: 1/-1;">No produce matches your criteria.</div>';
             return;
         }
 
-        // Calculate distance from NGO location to each produce item if coords available
-        if (ngoCurrentCoords) {
-            const distancePromises = items.map(async (item) => {
-                if (item.latitude && item.longitude) {
-                    try {
-                        item.distance = await fetchOSRMDistance(
-                            ngoCurrentCoords.lat,
-                            ngoCurrentCoords.lng,
-                            item.latitude,
-                            item.longitude
-                        );
-                        item.distanceMethod = "road";
-                    } catch (err) {
-                        console.warn("OSRM routing failed, falling back to Haversine direct distance:", err);
-                        item.distance = getHaversineDistance(
-                            ngoCurrentCoords.lat,
-                            ngoCurrentCoords.lng,
-                            item.latitude,
-                            item.longitude
-                        );
-                        item.distanceMethod = "direct";
-                    }
-                } else {
-                    item.distance = null;
-                    item.distanceMethod = null;
-                }
-            });
+        // Best match is always the first available item (already sorted by backend)
+        const bestMatch = items.find(i => i.status === 'available');
 
-            await Promise.all(distancePromises);
-
-            // Sort closest first, items with null distance placed at the end
-            items.sort((a, b) => {
-                if (a.distance === null) return 1;
-                if (b.distance === null) return -1;
-                return a.distance - b.distance;
-            });
+        // Render best-match hero card
+        let heroHtml = '';
+        if (bestMatch && bestMatch.match_score !== undefined) {
+            const reasons = bestMatch.match_reasons || buildMatchReasons(bestMatch, ngoCurrentCoords);
+            const score = bestMatch.match_score;
+            const deg = Math.round((score / 100) * 360);
+            heroHtml = `
+                <div class="best-match-section">
+                    <div class="best-match-label">🤖 AI Smart Match — Top Pick For You</div>
+                    <div class="best-match-hero">
+                        <div class="match-score-ring" style="--score-deg: ${deg}deg">
+                            <div class="match-score-text">
+                                <span class="match-score-pct">${score}%</span>
+                                <span class="match-score-sub">Match</span>
+                            </div>
+                        </div>
+                        <div class="best-match-body">
+                            <p class="best-match-produce-name">${bestMatch.produce_name}</p>
+                            <p class="best-match-farmer">by ${bestMatch.farmer_name || 'Anonymous Farmer'} · ${bestMatch.location}</p>
+                            <ul class="match-reasons">
+                                ${reasons.map(r => `<li>${r}</li>`).join('')}
+                            </ul>
+                            <div class="best-match-actions">
+                                <button class="btn-gold" onclick="requestPickup('${bestMatch.id}')">⚡ Request Pickup</button>
+                                <div class="best-match-meta">
+                                    <span>📦 ${bestMatch.quantity} kg</span>
+                                    <span>📅 ${bestMatch.harvest_date}</span>
+                                    ${bestMatch.distance_km !== null && bestMatch.distance_km !== undefined ? `<span>📍 ${bestMatch.distance_km.toFixed(1)} km</span>` : ''}
+                                    <span style="font-weight:600; color:#d97706;">${bestMatch.urgency_label || ''}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="browse-section-label">All Available Produce</div>
+            `;
         }
 
-        listEl.innerHTML = items.map(item => `
+        listEl.innerHTML = heroHtml + items.map(item => `
             <div class="produce-card">
                 <div class="produce-img-box">
                     <img class="produce-img" src="${item.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500'}" alt="${item.produce_name}">
@@ -736,7 +865,8 @@ async function loadNgoBrowse() {
                 </div>
                 <div class="produce-info">
                     <h4 class="produce-title">${item.produce_name}</h4>
-                    <div class="produce-meta">
+                    <span class="urgency-badge urgency-${item.urgency_level || 'fresh'}">${item.urgency_label || '✅ Fresh'}</span>
+                    <div class="produce-meta" style="margin-top: 0.5rem;">
                         <span class="produce-meta-label">Quantity:</span>
                         <span>${item.quantity} kg</span>
                     </div>
@@ -752,10 +882,16 @@ async function loadNgoBrowse() {
                         <span class="produce-meta-label">Location:</span>
                         <span>${item.location}</span>
                     </div>
-                    ${item.distance !== undefined && item.distance !== null ? `
+                    ${item.distance_km !== null && item.distance_km !== undefined ? `
                     <div class="produce-meta" style="color: #10b981; font-weight: 600; margin-top: 0.25rem;">
                         <span class="produce-meta-label">📍 Distance:</span>
-                        <span>${item.distance.toFixed(1)} km away (${item.distanceMethod})</span>
+                        <span>${item.distance_km.toFixed(1)} km away</span>
+                    </div>
+                    ` : ''}
+                    ${item.match_score !== undefined ? `
+                    <div class="produce-meta" style="color: #b45309; font-weight: 600;">
+                        <span class="produce-meta-label">🤖 Match:</span>
+                        <span>${item.match_score}%</span>
                     </div>
                     ` : ''}
                 </div>
@@ -1201,8 +1337,38 @@ async function loadNgoStats() {
     }
 }
 
-if (token && currentUser) {
-    showView(currentUser.role);
-} else {
-    showView('auth');
+async function initApp() {
+    if (!token || !currentUser) {
+        showView('auth');
+        return;
+    }
+
+    try {
+        // Validate token is still alive by hitting a lightweight authenticated endpoint
+        const res = await fetch(`${API_BASE}/stats/platform`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+            // Token invalid or expired — clear and redirect to login
+            throw new Error('Session expired');
+        }
+
+        // Normalise role: "Food Bank" users share the NGO view
+        const role = currentUser.role === 'Food Bank' ? 'NGO' : currentUser.role;
+        showView(role);
+
+    } catch (err) {
+        // Clear stale session data
+        token = null;
+        currentUser = null;
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        showView('auth');
+        if (err.message !== 'Session expired') {
+            showToast('Session expired. Please login again.', 'warning');
+        }
+    }
 }
+
+initApp();
