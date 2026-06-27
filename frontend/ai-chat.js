@@ -440,7 +440,16 @@
         inlineSpeechRecognition = new SpeechRecognition();
         inlineSpeechRecognition.continuous     = false;
         inlineSpeechRecognition.interimResults = false;
-        inlineSpeechRecognition.lang           = 'en-IN';
+        // Language is set dynamically on each click so UI language switches apply instantly
+
+        // BCP-47 locale map matching the app's translation keys
+        const SPEECH_LANG_MAP = {
+            en: 'en-IN',   // English (India)
+            hi: 'hi-IN',   // Hindi
+            mr: 'mr-IN',   // Marathi
+            te: 'te-IN',   // Telugu
+            kn: 'kn-IN',   // Kannada
+        };
 
         inlineSpeechRecognition.onstart = () => {
             inlineIsRecording = true;
@@ -504,10 +513,16 @@
             if (inlineIsRecording) {
                 inlineSpeechRecognition.stop();
             } else {
+                // Set language from currently active UI language right before starting
+                const activeLang = (typeof currentLang !== 'undefined' ? currentLang : null)
+                    || localStorage.getItem('lang')
+                    || 'en';
+                inlineSpeechRecognition.lang = SPEECH_LANG_MAP[activeLang] || 'en-IN';
                 inlineSpeechRecognition.start();
             }
         });
     }
+
 
     // ── Init ──────────────────────────────────────────────────────────────────
     function init() {
