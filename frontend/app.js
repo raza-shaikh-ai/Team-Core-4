@@ -264,6 +264,23 @@ authForm.addEventListener('submit', async (e) => {
     const email = authEmailInput.value;
     const password = authPasswordInput.value;
 
+    const authLoadingOverlay = document.getElementById('auth-loading-overlay');
+    const authLoadingMsg     = document.getElementById('auth-loading-msg');
+    const authSubmitBtn      = document.getElementById('auth-submit-btn');
+
+    const showAuthLoader = (msg) => {
+        authLoadingMsg.textContent = msg;
+        authLoadingOverlay.style.display = 'flex';
+        authSubmitBtn.disabled = true;
+        authSubmitBtn.style.opacity = '0.6';
+    };
+
+    const hideAuthLoader = () => {
+        authLoadingOverlay.style.display = 'none';
+        authSubmitBtn.disabled = false;
+        authSubmitBtn.style.opacity = '1';
+    };
+
     try {
         if (isRegisterMode) {
             const name = regNameInput.value;
@@ -272,6 +289,8 @@ authForm.addEventListener('submit', async (e) => {
             const lngVal = regLng.value;
             const latitude = latVal ? parseFloat(latVal) : null;
             const longitude = lngVal ? parseFloat(lngVal) : null;
+
+            showAuthLoader('Creating your account…');
 
             const response = await fetch(`${API_BASE}/auth/register`, {
                 method: 'POST',
@@ -284,7 +303,10 @@ authForm.addEventListener('submit', async (e) => {
                 throw new Error(err.detail || 'Registration failed');
             }
 
+            authLoadingMsg.textContent = 'Sending verification email…';
+
             const data = await response.json();
+            hideAuthLoader();
             otpEmailInput.value = email;
             otpCodeInput.value = '';
             showToast(data.message || (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_otp_sent) || 'OTP verification code sent');
@@ -318,6 +340,7 @@ authForm.addEventListener('submit', async (e) => {
             showView(currentUser.role);
         }
     } catch (err) {
+        hideAuthLoader();
         showToast(err.message, 'error');
     }
 });
