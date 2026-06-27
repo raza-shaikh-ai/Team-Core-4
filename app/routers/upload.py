@@ -73,7 +73,22 @@ async def _validate_image_with_bedrock(image_bytes: bytes, content_type: str) ->
         "image/webp": "webp",
         "image/gif":  "gif",
     }
-    img_format = fmt_map.get(content_type, "jpeg")
+    # Detect real format from magic bytes — browser Content-Type is unreliable
+    # and Bedrock 400s if the declared format doesn't match actual bytes.
+    header = image_bytes[:12]
+    if header[:3] == b'\xff\xd8\xff':
+        img_format = "jpeg"
+    elif header[:8] == b'\x89PNG\r\n\x1a\n':
+        img_format = "png"
+    elif header[:4] == b'RIFF' and header[8:12] == b'WEBP':
+        img_format = "webp"
+    elif header[:6] in (b'GIF87a', b'GIF89a'):
+        img_format = "gif"
+    else:
+        # Fallback: use fmt_map from claimed content_type
+        img_format = fmt_map.get(content_type, "jpeg")
+
+    logger.info("Claimed content_type=%s | Detected img_format=%s", content_type, img_format)
 
     body = {
         "messages": [
