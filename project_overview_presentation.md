@@ -1,5 +1,11 @@
 # 🌾 FarmShare: Simplified Presentation Guide
 
+* **Team Name:** Core4
+* **Problem Statement:** Build a platform connecting farmers with surplus produce directly to food banks and NGOs to reduce food waste.
+* **Objective:** Develop a sustainable platform that helps farmers donate or distribute surplus produce to food banks and NGOs, reducing food waste while ensuring excess food reaches people in need.
+
+---
+
 This guide describes the core features of **FarmShare** in simple, non-technical words, along with an explanation of how the **FastAPI Backend** makes them work behind the scenes.
 
 ---
@@ -24,7 +30,7 @@ When presenting, you can explain the core technical concepts of the system using
 Here is a breakdown of the platform's features, written in plain English, explaining how the **FastAPI Backend** powers them:
 
 ### 1. Multi-Lingual AI Assistant (HarvestLink AI)
-* **In Simple Words:** An AI chatbot helper that speaks 5 local languages: **English**, **Hindi (हिंदी)**, **Marathi (मराठी)**, **Telugu (తెలుగు)**, and **Kannada (ಕನ್ನಡ)**. A farmer can press a button, say what surplus food they have (e.g., *"I have 200 kg of fresh onions harvested today in Pune"*), and the AI automatically fills out the upload form for them. It also answers questions about food storage, shelf life, and donation rules.
+* **In Simple Words:** An AI chatbot helper that speaks 5 local languages: **English**, **Hindi (हिंदी)**, **Marathi (मराठी)**, **Telugu (తెలుగు)**, and **Kannada (కನ್ನಡ)**. A farmer can press a button, say what surplus food they have (e.g., *"I have 200 kg of fresh onions harvested today in Pune"*), and the AI automatically fills out the upload form for them. It also answers questions about food storage, shelf life, and donation rules.
 * **How FastAPI Backend Works:** 
   1. The browser records the farmer's voice using the built-in Web Speech API and turns it into text.
   2. The text is sent to the FastAPI backend (`/ai/voice-listing` endpoint).
@@ -79,11 +85,11 @@ Here is the complete step-by-step operational lifecycle of the FarmShare platfor
 ### 1. Registration & Email Verification (OTP Flow)
 ```mermaid
 sequenceDiagram
-    actor User as Farmer / NGO
-    participant FE as Frontend (Web/Mobile)
-    participant BE as FastAPI Backend
-    participant DB as Neon PostgreSQL
-    participant Email as SMTP Email Server
+    actor User as "Farmer / NGO"
+    participant FE as "Frontend (Web/Mobile)"
+    participant BE as "FastAPI Backend"
+    participant DB as "Neon PostgreSQL"
+    participant Email as "SMTP Email Server"
 
     User->>FE: Fill Registration Form (Name, Email, Role, Detect Location)
     FE->>BE: POST /auth/register (payload with Lat/Lng)
@@ -106,13 +112,13 @@ sequenceDiagram
 ### 2. Farmer Surplus Listing Flow (Manual & AI-Voice)
 ```mermaid
 sequenceDiagram
-    actor Farmer
-    participant FE as Frontend (Web/Mobile)
-    participant AI as HarvestLink AI (Bedrock)
-    participant BE as FastAPI Backend
-    participant Cloud as Cloudinary Storage
-    participant DB as Neon PostgreSQL
-    participant Email as SMTP Email Server
+    actor Farmer as "Farmer"
+    participant FE as "Frontend (Web/Mobile)"
+    participant AI as "HarvestLink AI (Bedrock)"
+    participant BE as "FastAPI Backend"
+    participant Cloud as "Cloudinary Storage"
+    participant DB as "Neon PostgreSQL"
+    participant Email as "SMTP Email Server"
 
     alt Option A: AI Voice Listing
         Farmer->>FE: Press "Speak" button & speak details
@@ -151,10 +157,10 @@ sequenceDiagram
 ### 3. Smart Matching & Pickup Request Flow
 ```mermaid
 sequenceDiagram
-    actor NGO
-    participant FE as Frontend (Web/Mobile)
-    participant BE as FastAPI Backend
-    participant DB as Neon PostgreSQL
+    actor NGO as "NGO"
+    participant FE as "Frontend (Web/Mobile)"
+    participant BE as "FastAPI Backend"
+    participant DB as "Neon PostgreSQL"
 
     NGO->>FE: Open Browse Feed (Map/List)
     FE->>FE: Request current GPS location
@@ -179,11 +185,11 @@ sequenceDiagram
 ### 4. Farmer Approval & Delivery Closing Flow
 ```mermaid
 sequenceDiagram
-    actor Farmer
-    actor NGO
-    participant FE as Frontend (Web/Mobile)
-    participant BE as FastAPI Backend
-    participant DB as Neon PostgreSQL
+    actor Farmer as "Farmer"
+    actor NGO as "NGO"
+    participant FE as "Frontend (Web/Mobile)"
+    participant BE as "FastAPI Backend"
+    participant DB as "Neon PostgreSQL"
 
     Farmer->>FE: Open "Requests" tab
     FE->>BE: GET /requests/incoming
@@ -273,7 +279,7 @@ erDiagram
 
 ## 🚀 Live Services & Deployment
 
-* **Backend Production API:** Hosted on AWS EC2 at `http://13.234.42.87:8000` (Swagger docs available at `/docs`).
+* **Backend Production API:** Hosted on AWS EC2 at `https://api.razadev.online` (Swagger docs available at `/docs`).
 * **Database Platform:** Neon Serverless PostgreSQL.
 * **AI Runtime:** AWS Bedrock proxy service.
 * **Storage Provider:** Cloudinary.

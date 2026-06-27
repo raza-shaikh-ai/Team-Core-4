@@ -367,15 +367,21 @@ produceImageFile.addEventListener('change', async () => {
     formData.append('file', file);
 
     const submitBtn = document.getElementById('submit-produce-btn');
+    const uploadWrapper = document.querySelector('.file-upload-wrapper');
     const uploadLabel = document.querySelector('.file-upload-wrapper span');
+
+    // Clear any previous rejection state when a new file is selected
+    uploadWrapper.style.border = '';
+    uploadWrapper.style.background = '';
+    const existingRejectionMsg = document.getElementById('ai-rejection-msg');
+    if (existingRejectionMsg) existingRejectionMsg.remove();
 
     // Disable submit and show uploading state
     submitBtn.disabled = true;
     submitBtn.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_uploading_image) || 'Uploading image...';
     submitBtn.style.opacity = '0.6';
     submitBtn.style.cursor = 'not-allowed';
-
-    uploadLabel.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_uploading_cloud) || 'Uploading to cloud... ⏳';
+    uploadLabel.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_uploading_cloud) || '🔍 Validating image with AI...';
 
     try {
         const response = await fetch(`${API_BASE}/upload/image`, {
@@ -388,20 +394,57 @@ produceImageFile.addEventListener('change', async () => {
 
         if (!response.ok) {
             const err = await response.json();
-            throw new Error(err.detail || 'Failed to upload image');
+            const isAiRejection = response.status === 422;
+            const errMsg = err.detail || 'Failed to upload image';
+            throw Object.assign(new Error(errMsg), { isAiRejection });
         }
 
         const data = await response.json();
         produceImageUrl.value = data.url;
         imageUploadPreview.src = data.url;
         imageUploadPreview.style.display = 'block';
-        showToast((TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_image_success) || 'Image uploaded successfully');
+        // Show success state on wrapper
+        uploadWrapper.style.border = '2px solid #10B981';
+        showToast((TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_image_success) || '✅ Image uploaded successfully');
         uploadLabel.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_upload_change) || 'Change selected image';
+
     } catch (err) {
-        showToast(err.message, 'error');
-        uploadLabel.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_upload_fail) || 'Upload failed. Click to try again.';
         produceImageUrl.value = '';
         imageUploadPreview.style.display = 'none';
+
+        if (err.isAiRejection) {
+            // ── AI Moderation Rejection ──────────────────────────────────────────
+            // Show a clear, permanent visual rejection state so the farmer
+            // understands exactly why the image was blocked.
+            uploadWrapper.style.border = '2px solid #EF4444';
+            uploadWrapper.style.background = 'rgba(239,68,68,0.07)';
+            uploadLabel.textContent = '🚫 Image rejected by AI';
+
+            // Inject a descriptive rejection banner below the upload wrapper
+            const rejectionEl = document.createElement('div');
+            rejectionEl.id = 'ai-rejection-msg';
+            rejectionEl.style.cssText = [
+                'margin-top:8px',
+                'padding:10px 14px',
+                'background:rgba(239,68,68,0.12)',
+                'border:1px solid rgba(239,68,68,0.4)',
+                'border-radius:8px',
+                'color:#FCA5A5',
+                'font-size:0.82rem',
+                'line-height:1.5'
+            ].join(';');
+            // Strip internal tech detail — show only the human-readable part
+            const cleanMsg = (err.message || '').replace(/Image rejected by AI moderation:\s*/i, '');
+            rejectionEl.innerHTML = `<strong>⚠️ AI Moderation Blocked This Image</strong><br>${cleanMsg || 'Please upload a clear photo of the surplus produce (fruits, vegetables, grains, etc.).'}`;
+            uploadWrapper.parentNode.insertBefore(rejectionEl, uploadWrapper.nextSibling);
+
+            showToast('Image rejected: Not food/produce related', 'error');
+        } else {
+            // Generic upload error
+            uploadWrapper.style.border = '2px solid #EF4444';
+            uploadLabel.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_upload_fail) || 'Upload failed. Click to try again.';
+            showToast(err.message, 'error');
+        }
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].btn_submit_listing) || 'Submit Listing';
