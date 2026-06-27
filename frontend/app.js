@@ -1,5 +1,5 @@
-const API_BASE = 'http://localhost:8000';
-// const API_BASE = 'http://13.234.42.87:8000';
+//const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://13.234.42.87:8000';
 
 let token = localStorage.getItem('token') || null;
 let currentUser = null;
