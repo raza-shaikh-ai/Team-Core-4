@@ -1,5 +1,5 @@
 //const API_BASE = 'http://localhost:8000';
-const API_BASE = 'http://13.234.42.87:8000';
+const API_BASE = 'https://api.razadev.online';
 
 let token = localStorage.getItem('token') || null;
 let currentUser = null;
@@ -175,7 +175,7 @@ function showToast(message, type = 'success') {
         <span>${message}</span>
         <button class="toast-close">&times;</button>
     `;
-    
+
     toast.querySelector('.toast-close').addEventListener('click', () => {
         toast.remove();
     });
@@ -260,7 +260,7 @@ authToggleLink.addEventListener('click', (e) => {
 
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     const email = authEmailInput.value;
     const password = authPasswordInput.value;
 
@@ -272,7 +272,7 @@ authForm.addEventListener('submit', async (e) => {
             const lngVal = regLng.value;
             const latitude = latVal ? parseFloat(latVal) : null;
             const longitude = lngVal ? parseFloat(lngVal) : null;
-            
+
             const response = await fetch(`${API_BASE}/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -361,20 +361,20 @@ logoutBtn.addEventListener('click', handleLogout);
 
 produceImageFile.addEventListener('change', async () => {
     if (!produceImageFile.files || produceImageFile.files.length === 0) return;
-    
+
     const file = produceImageFile.files[0];
     const formData = new FormData();
     formData.append('file', file);
 
     const submitBtn = document.getElementById('submit-produce-btn');
     const uploadLabel = document.querySelector('.file-upload-wrapper span');
-    
+
     // Disable submit and show uploading state
     submitBtn.disabled = true;
     submitBtn.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_uploading_image) || 'Uploading image...';
     submitBtn.style.opacity = '0.6';
     submitBtn.style.cursor = 'not-allowed';
-    
+
     uploadLabel.textContent = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang].toast_uploading_cloud) || 'Uploading to cloud... ⏳';
 
     try {
@@ -460,7 +460,7 @@ function deactivateAllFarmerTabs() {
     tabFarmerHistory.classList.remove('active');
     tabFarmerMap.classList.remove('active');
     tabFarmerStats.classList.remove('active');
-    
+
     farmerListingsTabContent.style.display = 'none';
     farmerRequestsTabContent.style.display = 'none';
     farmerHistoryTabContent.style.display = 'none';
@@ -509,7 +509,7 @@ function deactivateAllNgoTabs() {
     tabNgoHistory.classList.remove('active');
     tabNgoMap.classList.remove('active');
     tabNgoStats.classList.remove('active');
-    
+
     ngoBrowseTabContent.style.display = 'none';
     ngoRequestsTabContent.style.display = 'none';
     ngoHistoryTabContent.style.display = 'none';
@@ -579,9 +579,9 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; // Radius of the Earth in km
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
+    const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c; // Distance in km
@@ -944,7 +944,7 @@ async function loadNgoBrowse() {
             const reasons = buildMatchReasons(bestMatch, ngoCurrentCoords);
             const score = bestMatch.match_score;
             const deg = Math.round((score / 100) * 360);
-            
+
             const matchTitle = dict.ai_smart_match_title || "✨ AI Smart Match — Best Match For You";
             const aiRec = dict.ai_recommended || "AI RECOMMENDED";
             const matchPctLabel = dict.match_percentage || "Match";
@@ -1346,7 +1346,7 @@ let ngoMapInstance = null;
 async function loadMap(role) {
     const mapId = role === 'Farmer' ? 'farmer-map' : 'ngo-map';
     const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
-    
+
     try {
         const response = await fetch(`${API_BASE}/map/data`, {
             headers: { 'Authorization': `Bearer ${token}` }
